@@ -116,6 +116,7 @@ window.playAudio = async (id, btn) => {
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
   const fill = document.getElementById(`pf-${id}`);
 
+  // 1. Agar xuddi shu audio bosilsa (Pause/Play)
   if (currentPlayingId === id && currentAudio) {
     if (currentAudio.paused) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -129,6 +130,7 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
+  // 2. Oldingi audioni to'xtatish va vizualni DEFAULT holatga keltirish
   if (currentAudio) { 
     currentAudio.pause(); 
     currentAudio.src = ""; 
@@ -136,23 +138,25 @@ window.playAudio = async (id, btn) => {
   }
 
   if (currentPlayingId) {
+    // Oldingi pleyer ikonkasi
     const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
     if (oldIcon) {
       oldIcon.style.display = "block";
       oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
     }
+    // Oldingi spinnerni o'chirish
     const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
     if (oldSpin) oldSpin.remove();
-    
+    // Oldingi progress va vizualizatsiyani DEFAULT qilish
     const oldFill = document.getElementById(`pf-${currentPlayingId}`);
     if (oldFill) oldFill.style.width = "0%";
-    
     document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
       b.classList.remove('active'); 
       b.style.height = "5px"; 
     });
   }
 
+  // 3. Yangi audioni yuklashni boshlash
   const myToken = Date.now();
   lastLoadToken = myToken;
   currentPlayingId = id;
@@ -261,8 +265,7 @@ window.handleRecord = async () => {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
     try {
       studioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // WebM (Opus) formatiga majburlash - eng yuqori zichlik va tezlik
-      mediaRecorder = new MediaRecorder(studioStream, { mimeType: 'audio/webm;codecs=opus' });
+      mediaRecorder = new MediaRecorder(studioStream);
       const sCtx = new AudioContext();
       const sSrc = sCtx.createMediaStreamSource(studioStream);
       studioAnz = sCtx.createAnalyser();
@@ -302,53 +305,29 @@ window.handleRecord = async () => {
   }
 };
 
-// --- OPTIMALLASHGAN YUKLASH (Tugmani bosganda darhol ishlaydi) ---
 window.uploadWithChunks = async () => {
   const name = document.getElementById('rec-name').value || "MRAI Recording";
   const upTxt = document.getElementById('up-txt');
   const upBar = document.getElementById('up-bar');
+  const reader = new FileReader();
   
-  // UI-ni darhol ko'rsatish
   upTxt.style.display = 'block';
-  upBar.style.width = "0%";
+  reader.readAsDataURL(activeBlob);
+  reader.onloadend = async () => {
+    const base64 = reader.result;
+    const LIMIT = 900 * 1024;
+    const total = Math.ceil(base64.length / LIMIT);
+    const bytes = activeBlob.size;
+    let sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
 
-  const bytes = activeBlob.size;
-  const sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
-  
-  // Bloklash hajmi (Pentium uchun 750KB optimal)
-  const CHUNK_SIZE = 750 * 1024;
-  const totalChunks = Math.ceil(bytes / CHUNK_SIZE);
-
-  try {
     const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
-
-    // Faylni bo'laklab o'qish (Faqat kerakli qismni xotiraga oladi)
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, bytes);
-      const slice = activeBlob.slice(start, end);
-
-      const base64Chunk = await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(slice);
-      });
-
-      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { 
-        idx: i, 
-        data: base64Chunk 
-      });
-
-      // Progress bar yangilash
-      const progress = Math.round(((i + 1) / totalChunks) * 100);
-      upBar.style.width = progress + "%";
-      document.getElementById('up-p').innerText = progress;
+    for(let i=0; i<total; i++) {
+      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { idx: i, data: base64.substring(i*LIMIT, (i+1)*LIMIT) });
+      upBar.style.width = Math.round(((i+1)/total)*100) + "%";
+      document.getElementById('up-p').innerText = Math.round(((i+1)/total)*100);
     }
     location.reload();
-  } catch (err) {
-    console.error(err);
-    alert("Xatolik yuz berdi!");
-  }
+  };
 };
 
 window.onFileSelect = (el) => { 
