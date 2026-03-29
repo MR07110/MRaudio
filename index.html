@@ -3,50 +3,78 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MR Audio</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>MR Audio | Professional Music Player</title>
+  
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div id="up-bar"></div>
-<div id="up-txt">Saqlanmoqda... <span id="up-p">0</span>%</div>
+  <div id="up-bar"></div>
+  <div id="up-txt">Saqlanmoqda... <span id="up-p">0</span>%</div>
 
-<div class="container">
-  <section id="page-explore" class="page active">
-    <h1 class="header-title">MR AUDIO</h1>
-    <div id="audio-list"></div>
-    <div id="load-more-indicator" style="text-align:center; padding: 20px; display:none; color: var(--text-sec); font-size: 12px;">Yuklanmoqda...</div>
-  </section>
-
-  <section id="page-studio" class="page">
-    <h1 class="header-title">Audio qo'shish</h1>
-    <div class="studio-box">
-      <div id="studio-viz" class="studio-viz"></div>
-      <div id="timer" class="timer">00:00</div>
-      <input type="text" id="rec-name" class="ios-input" placeholder="Yozuv nomini kiriting...">
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <button id="rec-trigger" class="btn-svg btn-play" style="margin: 0 auto; border-color: var(--ios-red);" onclick="handleRecord()">
-          <svg class="svg-icon" style="fill:var(--ios-red)" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg>
-        </button>
-        <button id="save-cloud" class="ios-input" style="background:var(--spotify-green); color:white; font-weight:800; display:none" onclick="uploadWithChunks()">Saqlash</button>
-        <button onclick="document.getElementById('file-in').click()" style="color:var(--spotify-green); background:none; border:none; font-weight:600; margin-top:10px">Fayl yuklash</button>
-        <input type="file" id="file-in" hidden accept="audio/*" onchange="onFileSelect(this)">
+  <div class="container">
+    
+    <section id="page-explore" class="page active">
+      <h1 class="header-title">MR AUDIO</h1>
+      
+      <div id="audio-list"></div>
+      
+      <div id="load-more-indicator" style="text-align:center; padding: 20px; display:none; color: var(--text-sec); font-size: 12px;">
+        Yuklanmoqda...
       </div>
-    </div>
-  </section>
-</div>
+    </section>
 
-<nav class="nav-bar">
-  <button class="nav-item active" onclick="switchPage(this, 'page-explore')">
-    <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-    <span>Explore</span>
-  </button>
-  <button class="nav-item" onclick="switchPage(this, 'page-studio')">
-    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-    <span>Studio</span>
-  </button>
-</nav>
+    <section id="page-studio" class="page">
+      <h1 class="header-title">Audio qo'shish</h1>
+      
+      <div class="studio-box">
+        <div id="studio-viz" class="studio-viz"></div>
+        
+        <div id="timer" class="timer">00:00</div>
+        
+        <input type="text" id="rec-name" class="ios-input" placeholder="Yozuv nomini kiriting...">
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
+          
+          <button id="rec-trigger" class="btn-svg btn-play" style="border-color: var(--ios-red);" onclick="handleRecord()">
+            <svg class="svg-icon" style="fill:var(--ios-red)" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            </svg>
+          </button>
+          
+          <button id="save-cloud" class="ios-input" style="background:var(--spotify-green); color:white; font-weight:800; display:none; border:none; width: 100%; cursor: pointer;" onclick="uploadWithChunks()">
+            Bulutga saqlash
+          </button>
+          
+          <button onclick="document.getElementById('file-in').click()" style="color:var(--spotify-green); background:none; border:none; font-weight:600; font-size: 15px; cursor: pointer;">
+            Yoki fayl yuklash
+          </button>
+          <input type="file" id="file-in" hidden accept="audio/*" onchange="onFileSelect(this)">
+          
+        </div>
+      </div>
+    </section>
 
-<script type="module" src="main.js"></script>
+  </div>
+
+  <nav class="nav-bar">
+    <button class="nav-item active" onclick="switchPage(this, 'page-explore')">
+      <svg viewBox="0 0 24 24">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+      </svg>
+      <span>Explore</span>
+    </button>
+    <button class="nav-item" onclick="switchPage(this, 'page-studio')">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+      </svg>
+      <span>Studio</span>
+    </button>
+  </nav>
+
+  <script type="module" src="main.js"></script>
+
 </body>
 </html>
