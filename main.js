@@ -1,4 +1,3 @@
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore, collection, addDoc, query, orderBy, limit, startAfter, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
@@ -117,7 +116,6 @@ window.playAudio = async (id, btn) => {
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
   const fill = document.getElementById(`pf-${id}`);
 
-  // 1. Agar xuddi shu audio bosilsa (Pause/Play)
   if (currentPlayingId === id && currentAudio) {
     if (currentAudio.paused) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -131,7 +129,7 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
-  // 2. Oldingi audioni to'xtatish va vizualni DEFAULT holatga keltirish
+  // Eski audioni to'xtatish va vizualni RESET qilish
   if (currentAudio) { 
     currentAudio.pause(); 
     currentAudio.src = ""; 
@@ -139,25 +137,23 @@ window.playAudio = async (id, btn) => {
   }
 
   if (currentPlayingId) {
-    // Oldingi pleyer ikonkasi
     const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
     if (oldIcon) {
       oldIcon.style.display = "block";
       oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
     }
-    // Oldingi spinnerni o'chirish
     const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
     if (oldSpin) oldSpin.remove();
-    // Oldingi progress va vizualizatsiyani DEFAULT qilish
+    
     const oldFill = document.getElementById(`pf-${currentPlayingId}`);
     if (oldFill) oldFill.style.width = "0%";
+    
     document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
       b.classList.remove('active'); 
       b.style.height = "5px"; 
     });
   }
 
-  // 3. Yangi audioni yuklashni boshlash
   const myToken = Date.now();
   lastLoadToken = myToken;
   currentPlayingId = id;
