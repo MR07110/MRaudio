@@ -64,7 +64,6 @@ async function loadAudioList(isNext = false) {
   isFetchingList = false;
 }
 
-// Dastlabki yuklash
 loadAudioList();
 
 window.addEventListener('scroll', () => {
@@ -295,7 +294,17 @@ window.uploadWithChunks = async () => {
     const base64 = reader.result;
     const LIMIT = 900 * 1024;
     const total = Math.ceil(base64.length / LIMIT);
-    const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: (activeBlob.size/1024).toFixed(1) + " KB" });
+
+    // HAJMNI SIZ AYTGANDAY FORMATLASH (1000 lik nuqta bilan)
+    const bytes = activeBlob.size;
+    let sizeStr = "";
+    if (bytes >= 1000000) {
+      sizeStr = (bytes / 1000000).toFixed(1) + " MB";
+    } else {
+      sizeStr = (bytes / 1000).toFixed(1) + " KB";
+    }
+
+    const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
     for(let i=0; i<total; i++) {
       await addDoc(collection(db, `audios/${docRef.id}/chunks`), { idx: i, data: base64.substring(i*LIMIT, (i+1)*LIMIT) });
       upBar.style.width = Math.round(((i+1)/total)*100) + "%";
