@@ -8,22 +8,32 @@
   --bg-soft: #f2f2f7;
 }
 
-/* --- AVTOMATIK TUNGI REJIM (DARK MODE) --- */
+/* --- QO'LDA VA AVTOMATIK TUNGI REJIM --- */
+/* Tizim sozlamasi yoki body-da .dark-theme klassi bo'lganda ishlaydi */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light-theme) {
     --bg: #000000;
     --text-main: #ffffff;
     --text-sec: #8e8e93;
     --bg-soft: #1c1c1e;
     --wave-color: #3aa89a;
   }
-  .nav-bar { background: rgba(0,0,0,0.8); border-top-color: #333; }
-  .audio-card { border-bottom-color: #1c1c1e; }
-  .btn-play { border-color: #ffffff; }
-  .svg-icon { fill: #ffffff; }
-  .progress-box { background: #333; }
-  .s-bar { background: #333; }
 }
+
+body.dark-theme {
+  --bg: #000000;
+  --text-main: #ffffff;
+  --text-sec: #8e8e93;
+  --bg-soft: #1c1c1e;
+  --wave-color: #3aa89a;
+}
+
+body.dark-theme .nav-bar { background: rgba(0,0,0,0.8); border-top-color: #333; }
+body.dark-theme .audio-card { border-bottom-color: #1c1c1e; }
+body.dark-theme .btn-play { border-color: #ffffff; }
+body.dark-theme .svg-icon { fill: #ffffff; }
+body.dark-theme .progress-box { background: #333; }
+body.dark-theme .s-bar { background: #333; }
 
 * { 
   box-sizing: border-box; 
@@ -38,7 +48,7 @@ body {
   padding-bottom: 150px; 
   color: var(--text-main); 
   overflow-x: hidden;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .container { 
@@ -54,7 +64,7 @@ body {
   letter-spacing: -1px; 
 }
 
-/* --- VAQT ANIMATSIYASI VA KO'RINISHI --- */
+/* --- VAQT ANIMATSIYASI --- */
 [id^="time-"] {
   font-size: 12px;
   color: var(--text-sec);
@@ -66,7 +76,6 @@ body {
   display: block;
 }
 
-/* Sekund o'zgargandagi "sakrash" animatsiyasi */
 .time-update {
   animation: timePop 0.3s ease-out;
 }
@@ -103,11 +112,20 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-/* --- CARDS --- */
+/* --- CARDS & FOCUS --- */
 .audio-card { 
   margin-bottom: 40px; 
-  border-bottom: 1px solid #f2f2f7; 
+  border-bottom: 1px solid var(--bg-soft); 
   padding-bottom: 20px; 
+  transition: all 0.5s ease;
+}
+
+/* Deep link orqali kelganda fokus effekti */
+.audio-card:target {
+  background: var(--bg-soft);
+  padding: 15px;
+  border-radius: 16px;
+  box-shadow: 0 0 20px rgba(29, 185, 84, 0.2);
 }
 
 .card-meta h4 { 
@@ -122,7 +140,7 @@ body {
   font-size: 13px; 
 }
 
-/* --- WAVEFORM VISUALIZER --- */
+/* --- WAVEFORM --- */
 .waveform-visualizer { 
   width: 100%; 
   height: 70px; 
@@ -177,7 +195,7 @@ body {
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
-/* --- PLAYER CONTROLS --- */
+/* --- CONTROLS --- */
 .controls { 
   display: flex; 
   align-items: center; 
@@ -207,7 +225,6 @@ body {
   border: 2.5px solid var(--text-main); 
   border-radius: 50%; 
   justify-content: center; 
-  position: relative;
 }
 
 .svg-icon { 
@@ -215,6 +232,7 @@ body {
   height: 26px; 
   fill: var(--text-main); 
   z-index: 2;
+  transition: fill 0.3s;
 }
 
 .btn-svg.loop-active .svg-icon { 
@@ -278,22 +296,18 @@ body {
   color: var(--text-main);
 }
 
-.ios-input:focus {
-  background: #e5e5ea;
-}
-
 /* --- NAVIGATION BAR --- */
 .nav-bar { 
   position: fixed; 
   bottom: 0; 
   left: 0; 
   right: 0; 
-  background: rgba(var(--bg), 0.85); 
+  background: rgba(255, 255, 255, 0.85); 
   backdrop-filter: blur(20px); 
   -webkit-backdrop-filter: blur(20px);
   display: flex; 
   padding: 12px 0 35px; 
-  border-top: 1px solid #eee; 
+  border-top: 1px solid rgba(0,0,0,0.05); 
   z-index: 1000; 
 }
 
