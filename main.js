@@ -20,13 +20,14 @@ let mediaRecorder, chunks = [], activeBlob, timerInterval;
 let audioCtx = null;
 let currentAudio = null;      
 let currentPlayingId = null;   
+let lastLoadToken = null;
 let isDragging = false; 
 
 let lastVisibleDoc = null;
 let isFetchingList = false;
 let hasMoreDocs = true;
 
-// --- 0. NAVIGATSIYA ---
+// --- 0. NAVIGATSIYA (2-koddan) ---
 window.switchPage = (btn, pageId) => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -98,6 +99,7 @@ function renderCard(id, data) {
     </div>
   `;
 
+  // Listenerlar (1-kod mantiqi bilan)
   div.querySelector(`#play-btn-${id}`).onclick = (e) => window.playAudio(id, e.currentTarget);
   div.querySelector(`#pbox-${id}`).onmousedown = (e) => window.playAudio.seek(e, id);
   div.querySelector(`#pbox-${id}`).ontouchstart = (e) => window.playAudio.seek(e, id);
@@ -109,7 +111,7 @@ function renderCard(id, data) {
   return div;
 }
 
-// --- 2. PLEYER NAZORATI ---
+// --- 2. PLEYER NAZORATI (1-koddan takomillashtirilgan) ---
 window.playAudio = async (id, btn) => {
   const icon = document.getElementById(`ic-${id}`);
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
@@ -128,7 +130,7 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
-  if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; }
+  if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio.load(); }
 
   if (currentPlayingId) {
       const prevIcon = document.getElementById(`ic-${currentPlayingId}`);
@@ -138,7 +140,10 @@ window.playAudio = async (id, btn) => {
       document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { b.classList.remove('active'); b.style.height = "5px"; });
   }
 
+  const myToken = Date.now();
+  lastLoadToken = myToken;
   currentPlayingId = id;
+
   const spinner = document.createElement('div');
   spinner.className = 'loading-spinner';
   spinner.id = `spin-${id}`;
@@ -147,6 +152,8 @@ window.playAudio = async (id, btn) => {
 
   try {
     const snap = await getDocs(query(collection(db, `audios/${id}/chunks`), orderBy("idx")));
+    if (lastLoadToken !== myToken) return;
+
     let b64 = ""; snap.forEach(c => b64 += c.data().data);
     const audio = new Audio(b64);
     currentAudio = audio;
@@ -200,11 +207,12 @@ function startViz(audio, analyzer, dataArray, id, bars, fill) {
   draw();
 }
 
-// --- 3. SEEKING & EXTRA ---
+// --- 3. SEEKING & EXTRA (1-kod surish mantiqi bilan) ---
 window.playAudio.seek = (e, id) => {
-  if (currentPlayingId !== id || !currentAudio) return;
+  if (currentPlayingId !== id || !currentAudio || !currentAudio.duration) return;
   const box = document.getElementById(`pbox-${id}`);
   const fill = document.getElementById(`pf-${id}`);
+  
   const update = (clientX) => {
     const rect = box.getBoundingClientRect();
     let p = (clientX - rect.left) / rect.width;
@@ -212,11 +220,13 @@ window.playAudio.seek = (e, id) => {
     fill.style.width = (p * 100) + "%";
     currentAudio.currentTime = p * currentAudio.duration;
   };
+
   const onMove = (me) => { isDragging = true; update(me.touches ? me.touches[0].clientX : me.clientX); };
   const onStop = () => { isDragging = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('touchmove', onMove); };
+  
   update(e.touches ? e.touches[0].clientX : e.clientX);
   window.addEventListener('mousemove', onMove);
-  window.addEventListener('touchmove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: false });
   window.addEventListener('mouseup', onStop, { once: true });
   window.addEventListener('touchend', onStop, { once: true });
 };
@@ -229,7 +239,7 @@ window.playAudio.download = async (id, name) => {
   const a = document.createElement("a"); a.href = b64; a.download = name + ".webm"; a.click();
 };
 
-// --- 4. STUDIO & RECORDING ---
+// --- 4. STUDIO & RECORDING (2-koddan) ---
 let studioAnz, studioData, studioStream;
 window.handleRecord = async () => {
   const btn = document.getElementById('rec-trigger');
@@ -295,14 +305,8 @@ window.uploadWithChunks = async () => {
     const LIMIT = 900 * 1024;
     const total = Math.ceil(base64.length / LIMIT);
 
-    // HAJMNI SIZ AYTGANDAY FORMATLASH (1000 lik nuqta bilan)
     const bytes = activeBlob.size;
-    let sizeStr = "";
-    if (bytes >= 1000000) {
-      sizeStr = (bytes / 1000000).toFixed(1) + " MB";
-    } else {
-      sizeStr = (bytes / 1000).toFixed(1) + " KB";
-    }
+    let sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
 
     const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
     for(let i=0; i<total; i++) {
