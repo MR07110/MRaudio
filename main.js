@@ -27,7 +27,7 @@ let lastVisibleDoc = null;
 let isFetchingList = false;
 let hasMoreDocs = true;
 
-// --- 0. NAVIGATSIYA (2-koddan) ---
+// --- 0. NAVIGATSIYA ---
 window.switchPage = (btn, pageId) => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -99,7 +99,6 @@ function renderCard(id, data) {
     </div>
   `;
 
-  // Listenerlar (1-kod mantiqi bilan)
   div.querySelector(`#play-btn-${id}`).onclick = (e) => window.playAudio(id, e.currentTarget);
   div.querySelector(`#pbox-${id}`).onmousedown = (e) => window.playAudio.seek(e, id);
   div.querySelector(`#pbox-${id}`).ontouchstart = (e) => window.playAudio.seek(e, id);
@@ -111,12 +110,13 @@ function renderCard(id, data) {
   return div;
 }
 
-// --- 2. PLEYER NAZORATI (1-koddan takomillashtirilgan) ---
+// --- 2. PLEYER NAZORATI ---
 window.playAudio = async (id, btn) => {
   const icon = document.getElementById(`ic-${id}`);
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
   const fill = document.getElementById(`pf-${id}`);
 
+  // 1. Agar xuddi shu audio bosilsa (Pause/Play)
   if (currentPlayingId === id && currentAudio) {
     if (currentAudio.paused) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -130,16 +130,33 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
-  if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio.load(); }
-
-  if (currentPlayingId) {
-      const prevIcon = document.getElementById(`ic-${currentPlayingId}`);
-      if (prevIcon) prevIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-      const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
-      if (oldSpin) oldSpin.remove();
-      document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { b.classList.remove('active'); b.style.height = "5px"; });
+  // 2. Oldingi audioni to'xtatish va vizualni DEFAULT holatga keltirish
+  if (currentAudio) { 
+    currentAudio.pause(); 
+    currentAudio.src = ""; 
+    currentAudio.load(); 
   }
 
+  if (currentPlayingId) {
+    // Oldingi pleyer ikonkasi
+    const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
+    if (oldIcon) {
+      oldIcon.style.display = "block";
+      oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    }
+    // Oldingi spinnerni o'chirish
+    const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
+    if (oldSpin) oldSpin.remove();
+    // Oldingi progress va vizualizatsiyani DEFAULT qilish
+    const oldFill = document.getElementById(`pf-${currentPlayingId}`);
+    if (oldFill) oldFill.style.width = "0%";
+    document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
+      b.classList.remove('active'); 
+      b.style.height = "5px"; 
+    });
+  }
+
+  // 3. Yangi audioni yuklashni boshlash
   const myToken = Date.now();
   lastLoadToken = myToken;
   currentPlayingId = id;
@@ -207,7 +224,7 @@ function startViz(audio, analyzer, dataArray, id, bars, fill) {
   draw();
 }
 
-// --- 3. SEEKING & EXTRA (1-kod surish mantiqi bilan) ---
+// --- 3. SEEKING & EXTRA ---
 window.playAudio.seek = (e, id) => {
   if (currentPlayingId !== id || !currentAudio || !currentAudio.duration) return;
   const box = document.getElementById(`pbox-${id}`);
@@ -239,7 +256,7 @@ window.playAudio.download = async (id, name) => {
   const a = document.createElement("a"); a.href = b64; a.download = name + ".webm"; a.click();
 };
 
-// --- 4. STUDIO & RECORDING (2-koddan) ---
+// --- 4. STUDIO & RECORDING ---
 let studioAnz, studioData, studioStream;
 window.handleRecord = async () => {
   const btn = document.getElementById('rec-trigger');
@@ -249,7 +266,6 @@ window.handleRecord = async () => {
     try {
       studioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder = new MediaRecorder(studioStream);
-      
       const sCtx = new AudioContext();
       const sSrc = sCtx.createMediaStreamSource(studioStream);
       studioAnz = sCtx.createAnalyser();
@@ -280,14 +296,11 @@ window.handleRecord = async () => {
           studioStream.getTracks().forEach(t => t.stop());
       };
       
-      mediaRecorder.start(); 
-      startTimer();
-      drawStudio();
+      mediaRecorder.start(); startTimer(); drawStudio();
       btn.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" style="fill:var(--ios-red)"/></svg>';
     } catch (e) { alert("Mikrofon ruxsati kerak!"); }
   } else {
-    mediaRecorder.stop(); 
-    clearInterval(timerInterval);
+    mediaRecorder.stop(); clearInterval(timerInterval);
     btn.innerHTML = '<svg class="svg-icon" style="fill:var(--ios-red)" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg>';
   }
 };
@@ -304,7 +317,6 @@ window.uploadWithChunks = async () => {
     const base64 = reader.result;
     const LIMIT = 900 * 1024;
     const total = Math.ceil(base64.length / LIMIT);
-
     const bytes = activeBlob.size;
     let sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
 
