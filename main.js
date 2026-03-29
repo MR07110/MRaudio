@@ -129,7 +129,6 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
-  // Eski audioni to'xtatish va vizualni RESET qilish
   if (currentAudio) { 
     currentAudio.pause(); 
     currentAudio.src = ""; 
@@ -250,7 +249,7 @@ window.playAudio.toggleLoop = (id, btn) => { if (currentPlayingId === id && curr
 window.playAudio.download = async (id, name) => {
   const snap = await getDocs(query(collection(db, `audios/${id}/chunks`), orderBy("idx")));
   let b64 = ""; snap.forEach(c => b64 += c.data().data);
-  const a = document.createElement("a"); a.href = b64; a.download = name + ".mp3"; a.click();
+  const a = document.createElement("a"); a.href = b64; a.download = name + ".webm"; a.click();
 };
 
 // --- 4. STUDIO & RECORDING ---
@@ -262,7 +261,8 @@ window.handleRecord = async () => {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
     try {
       studioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(studioStream);
+      // WebM (Opus) formatiga majburlash - eng yuqori zichlik va tezlik
+      mediaRecorder = new MediaRecorder(studioStream, { mimeType: 'audio/webm;codecs=opus' });
       const sCtx = new AudioContext();
       const sSrc = sCtx.createMediaStreamSource(studioStream);
       studioAnz = sCtx.createAnalyser();
@@ -288,7 +288,7 @@ window.handleRecord = async () => {
       chunks = [];
       mediaRecorder.ondataavailable = e => chunks.push(e.data);
       mediaRecorder.onstop = () => { 
-          activeBlob = new Blob(chunks, { type: 'audio/mp3' }); 
+          activeBlob = new Blob(chunks, { type: 'audio/webm' }); 
           document.getElementById('save-cloud').style.display = 'block';
           studioStream.getTracks().forEach(t => t.stop());
       };
@@ -302,29 +302,53 @@ window.handleRecord = async () => {
   }
 };
 
+// --- OPTIMALLASHGAN YUKLASH (Tugmani bosganda darhol ishlaydi) ---
 window.uploadWithChunks = async () => {
   const name = document.getElementById('rec-name').value || "MRAI Recording";
   const upTxt = document.getElementById('up-txt');
   const upBar = document.getElementById('up-bar');
-  const reader = new FileReader();
   
+  // UI-ni darhol ko'rsatish
   upTxt.style.display = 'block';
-  reader.readAsDataURL(activeBlob);
-  reader.onloadend = async () => {
-    const base64 = reader.result;
-    const LIMIT = 900 * 1024;
-    const total = Math.ceil(base64.length / LIMIT);
-    const bytes = activeBlob.size;
-    let sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
+  upBar.style.width = "0%";
 
+  const bytes = activeBlob.size;
+  const sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
+  
+  // Bloklash hajmi (Pentium uchun 750KB optimal)
+  const CHUNK_SIZE = 750 * 1024;
+  const totalChunks = Math.ceil(bytes / CHUNK_SIZE);
+
+  try {
     const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
-    for(let i=0; i<total; i++) {
-      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { idx: i, data: base64.substring(i*LIMIT, (i+1)*LIMIT) });
-      upBar.style.width = Math.round(((i+1)/total)*100) + "%";
-      document.getElementById('up-p').innerText = Math.round(((i+1)/total)*100);
+
+    // Faylni bo'laklab o'qish (Faqat kerakli qismni xotiraga oladi)
+    for (let i = 0; i < totalChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, bytes);
+      const slice = activeBlob.slice(start, end);
+
+      const base64Chunk = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(slice);
+      });
+
+      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { 
+        idx: i, 
+        data: base64Chunk 
+      });
+
+      // Progress bar yangilash
+      const progress = Math.round(((i + 1) / totalChunks) * 100);
+      upBar.style.width = progress + "%";
+      document.getElementById('up-p').innerText = progress;
     }
     location.reload();
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Xatolik yuz berdi!");
+  }
 };
 
 window.onFileSelect = (el) => { 
