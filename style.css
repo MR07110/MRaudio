@@ -1,281 +1,56 @@
-/* 1. ASOSIY SOZLAMALAR (VARIABLES & RESET) */
 :root {
-  --spotify-green: #1DB954;
-  --ios-red: #ff3b30;
-  --bg: #ffffff;
-  --text-main: #000;
-  --text-sec: #8e8e93;
-  --wave-color: #47c1b1;
+  --spotify-green: #1DB954; --ios-red: #ff3b30; --bg: #ffffff;
+  --text-main: #000; --text-sec: #8e8e93; --wave-color: #47c1b1;
 }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); margin: 0; padding-bottom: 150px; color: var(--text-main); }
+.container { max-width: 500px; margin: 0 auto; padding: 20px; }
+.header-title { font-size: 32px; font-weight: 800; margin-bottom: 25px; letter-spacing: -1px; }
 
-* { 
-  box-sizing: border-box; 
-  -webkit-tap-highlight-color: transparent; 
-  outline: none; 
-}
+/* LOADER */
+#up-bar { position: fixed; top: 0; left: 0; height: 4px; background: var(--spotify-green); width: 0%; z-index: 3000; transition: 0.3s; }
+#up-txt { position: fixed; top: 10px; right: 15px; background: #000; color: #fff; font-size: 10px; padding: 4px 12px; border-radius: 20px; display: none; z-index: 3000; }
 
-body { 
-  font-family: -apple-system, system-ui, sans-serif; 
-  background: var(--bg); 
-  margin: 0; 
-  padding-bottom: 150px; 
-  color: var(--text-main); 
-}
+/* CARDS */
+.audio-card { margin-bottom: 40px; border-bottom: 1px solid #f2f2f7; padding-bottom: 15px; }
+.card-meta h4 { margin: 0; font-size: 18px; }
+.card-meta p { margin: 5px 0; color: var(--text-sec); font-size: 12px; }
 
-.container { 
-  max-width: 500px; 
-  margin: 0 auto; 
-  padding: 20px; 
-}
+/* WAVEFORM VISUALIZER */
+.waveform-visualizer { width: 100%; height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 2.5px; margin: 20px 0; }
+.w-bar { flex: 1; border-radius: 10px; height: 5px; background: #e5e5ea; transition: height 0.1s ease, background 0.3s; }
+.w-bar.active { background: var(--wave-color); }
 
-.header-title { 
-  font-size: 32px; 
-  font-weight: 800; 
-  margin-bottom: 25px; 
-  letter-spacing: -1px; 
-}
+/* PROGRESS */
+.progress-box { position: relative; width: 100%; height: 4px; background: #eee; border-radius: 2px; margin-bottom: 20px; cursor: pointer; }
+.progress-fill { height: 100%; background: var(--spotify-green); width: 0%; border-radius: 2px; position: relative; }
+.progress-fill::after { content: ''; position: absolute; right: -6px; top: -5px; width: 14px; height: 14px; background: #fff; border: 2px solid var(--spotify-green); border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-/* 2. YUKLASH INDIKATORI (LOADER) */
-#up-bar { 
-  position: fixed; 
-  top: 0; left: 0; 
-  height: 4px; 
-  background: var(--spotify-green); 
-  width: 0%; 
-  z-index: 3000; 
-  transition: 0.3s; 
-}
+/* CONTROLS */
+.controls { display: flex; align-items: center; justify-content: center; gap: 25px; }
+.btn-svg { background: none; border: none; cursor: pointer; padding: 10px; display: flex; align-items: center; transition: 0.2s; position: relative; }
+.btn-svg:active { opacity: 0.5; transform: scale(0.9); }
+.btn-play { width: 60px; height: 60px; border: 2px solid #000; border-radius: 50%; justify-content: center; position: relative; }
+.svg-icon { width: 24px; height: 24px; fill: #000; z-index: 2; }
+.btn-svg.loop-active .svg-icon { fill: var(--spotify-green); }
 
-#up-txt { 
-  position: fixed; 
-  top: 10px; 
-  right: 15px; 
-  background: #000; 
-  color: #fff; 
-  font-size: 10px; 
-  padding: 4px 12px; 
-  border-radius: 20px; 
-  display: none; 
-  z-index: 3000; 
-}
+/* STUDIO */
+.studio-box { text-align: center; padding: 30px 0; }
+.timer { font-size: 60px; font-weight: 200; margin: 15px 0; font-variant-numeric: tabular-nums; }
+.studio-viz { height: 80px; display: flex; align-items: center; justify-content: center; gap: 3px; margin-bottom: 25px; }
+.s-bar { width: 4px; border-radius: 2px; background: #eee; transition: height 0.05s; }
+.ios-input { width: 100%; padding: 18px; background: #f2f2f7; border: none; border-radius: 15px; font-size: 17px; margin-bottom: 15px; }
 
-/* 3. AUDIO KARTALARI (EXPLORE PAGE) */
-.audio-card { 
-  margin-bottom: 40px; 
-  border-bottom: 1px solid #f2f2f7; 
-  padding-bottom: 15px; 
-}
+/* NAV */
+.nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(20px); display: flex; padding: 15px 0 35px; border-top: 1px solid #eee; z-index: 1000; }
+.nav-item { flex: 1; text-align: center; border: none; background: none; color: #8e8e93; font-size: 11px; font-weight: 600; cursor: pointer; }
+.nav-item.active { color: var(--spotify-green); }
+.nav-item svg { display: block; margin: 0 auto 5px; fill: currentColor; width: 26px; height: 26px; }
 
-.card-meta h4 { 
-  margin: 0; 
-  font-size: 18px; 
-}
+.page { display: none; }
+.page.active { display: block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.card-meta p { 
-  margin: 5px 0; 
-  color: var(--text-sec); 
-  font-size: 12px; 
-}
-
-/* 4. VIZUALIZATSIYA (WAVEFORM) */
-.waveform-visualizer { 
-  width: 100%; 
-  height: 70px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  gap: 2.5px; 
-  margin: 20px 0; 
-}
-
-.w-bar { 
-  flex: 1; 
-  border-radius: 10px; 
-  height: 5px; 
-  background: #e5e5ea; 
-  transition: height 0.1s ease, background 0.3s; 
-}
-
-.w-bar.active { 
-  background: var(--wave-color); 
-}
-
-/* 5. PROGRESS BAR */
-.progress-box { 
-  position: relative; 
-  width: 100%; 
-  height: 4px; 
-  background: #eee; 
-  border-radius: 2px; 
-  margin-bottom: 20px; 
-  cursor: pointer; 
-}
-
-.progress-fill { 
-  height: 100%; 
-  background: var(--spotify-green); 
-  width: 0%; 
-  border-radius: 2px; 
-  position: relative; 
-}
-
-.progress-fill::after { 
-  content: ''; 
-  position: absolute; 
-  right: -6px; 
-  top: -5px; 
-  width: 14px; 
-  height: 14px; 
-  background: #fff; 
-  border: 2px solid var(--spotify-green); 
-  border-radius: 50%; 
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
-}
-
-/* 6. BOSHQARUV TUGMALARI (PLAYER CONTROLS) */
-.controls { 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  gap: 25px; 
-}
-
-.btn-svg { 
-  background: none; 
-  border: none; 
-  cursor: pointer; 
-  padding: 10px; 
-  display: flex; 
-  align-items: center; 
-  transition: 0.2s; 
-  position: relative;
-}
-
-.btn-svg:active { 
-  opacity: 0.5; 
-  transform: scale(0.9); 
-}
-
-.btn-play { 
-  width: 60px; 
-  height: 60px; 
-  border: 2px solid #000; 
-  border-radius: 50%; 
-  justify-content: center; 
-  position: relative; 
-}
-
-.svg-icon { 
-  width: 24px; 
-  height: 24px; 
-  fill: #000; 
-  z-index: 2;
-}
-
-.btn-svg.loop-active .svg-icon { 
-  fill: var(--spotify-green); 
-}
-
-/* 7. ANIMATSIYALAR (SPINNER & TRANSITIONS) */
-@keyframes spin { 
-  100% { transform: rotate(360deg); } 
-}
-
-.loading-spinner {
-  position: absolute; 
-  top: -2px; left: -2px; right: -2px; bottom: -2px;
-  border: 2px solid transparent; 
-  border-top-color: var(--spotify-green); 
-  border-right-color: var(--spotify-green);
-  border-radius: 50%; 
-  animation: spin 0.8s linear infinite; 
-  z-index: 1;
-}
-
-/* 8. STUDIO (RECORDING PAGE) */
-.studio-box { 
-  text-align: center; 
-  padding: 30px 0; 
-}
-
-.timer { 
-  font-size: 60px; 
-  font-weight: 200; 
-  margin: 15px 0; 
-  font-variant-numeric: tabular-nums; 
-}
-
-.studio-viz { 
-  height: 80px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  gap: 3px; 
-  margin-bottom: 25px; 
-}
-
-.s-bar { 
-  width: 4px; 
-  border-radius: 2px; 
-  background: #eee; 
-  transition: height 0.05s; 
-}
-
-.ios-input { 
-  width: 100%; 
-  padding: 18px; 
-  background: #f2f2f7; 
-  border: none; 
-  border-radius: 15px; 
-  font-size: 17px; 
-  margin-bottom: 15px; 
-}
-
-/* 9. NAVIGATSIYA (NAV BAR) */
-.nav-bar { 
-  position: fixed; 
-  bottom: 0; left: 0; right: 0; 
-  background: rgba(255,255,255,0.9); 
-  backdrop-filter: blur(20px); 
-  display: flex; 
-  padding: 15px 0 35px; 
-  border-top: 1px solid #eee; 
-  z-index: 1000; 
-}
-
-.nav-item { 
-  flex: 1; 
-  text-align: center; 
-  border: none; 
-  background: none; 
-  color: #8e8e93; 
-  font-size: 11px; 
-  font-weight: 600; 
-}
-
-.nav-item.active { 
-  color: var(--spotify-green); 
-}
-
-.nav-item svg { 
-  display: block; 
-  margin: 0 auto 5px; 
-  fill: currentColor; 
-  width: 26px; 
-  height: 26px; 
-}
-
-/* 10. SAHIFA ALMASHINUVI (PAGING) */
-.page { 
-  display: none; 
-}
-
-.page.active { 
-  display: block; 
-  animation: fadeIn 0.4s ease; 
-}
-
-@keyframes fadeIn { 
-  from { opacity: 0; } 
-  to { opacity: 1; } 
-}
+/* SPINNER */
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.loading-spinner { position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border: 2px solid transparent; border-top-color: var(--spotify-green); border-right-color: var(--spotify-green); border-radius: 50%; animation: spin 0.8s linear infinite; z-index: 1; }
