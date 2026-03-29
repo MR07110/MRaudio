@@ -110,7 +110,7 @@ function renderCard(id, data) {
   return div;
 }
 
-// --- 2. PLEYER NAZORATI ---
+// --- 2. PLEYER NAZORATI (TEZKOR VARIANT) ---
 window.playAudio = async (id, btn) => {
   const icon = document.getElementById(`ic-${id}`);
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
@@ -129,24 +129,23 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
+  // Eski audioni to'xtatish va xotirani bo'shatish
   if (currentAudio) { 
     currentAudio.pause(); 
+    if (currentAudio.src.startsWith('blob:')) {
+      URL.revokeObjectURL(currentAudio.src); // Xotiradan o'chirish
+    }
     currentAudio.src = ""; 
     currentAudio.load(); 
   }
 
   if (currentPlayingId) {
     const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
-    if (oldIcon) {
-      oldIcon.style.display = "block";
-      oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-    }
+    if (oldIcon) { oldIcon.style.display = "block"; oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>'; }
     const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
     if (oldSpin) oldSpin.remove();
-    
     const oldFill = document.getElementById(`pf-${currentPlayingId}`);
     if (oldFill) oldFill.style.width = "0%";
-    
     document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
       b.classList.remove('active'); 
       b.style.height = "5px"; 
@@ -167,8 +166,24 @@ window.playAudio = async (id, btn) => {
     const snap = await getDocs(query(collection(db, `audios/${id}/chunks`), orderBy("idx")));
     if (lastLoadToken !== myToken) return;
 
-    let b64 = ""; snap.forEach(c => b64 += c.data().data);
-    const audio = new Audio(b64);
+    // 1. Chunks yig'ish
+    let b64Data = ""; 
+    snap.forEach(c => b64Data += c.data().data);
+
+    // 2. Tezkors Base64 -> Blob URL konvertatsiyasi
+    const base64Parts = b64Data.split(',');
+    const mimeType = base64Parts[0].match(/:(.*?);/)[1];
+    const bstr = atob(base64Parts[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) { u8arr[n] = bstr.charCodeAt(n); }
+    
+    const audioBlob = new Blob([u8arr], { type: mimeType });
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    // 3. Audio yaratish
+    const audio = new Audio();
+    audio.src = audioUrl;
     currentAudio = audio;
 
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -181,6 +196,7 @@ window.playAudio = async (id, btn) => {
     const data = new Uint8Array(analyzer.frequencyBinCount);
 
     audio.anz = analyzer; audio.dat = data;
+    
     if (spinner) spinner.remove();
     icon.style.display = 'block';
     icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
@@ -261,7 +277,6 @@ window.handleRecord = async () => {
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {
     try {
       studioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // WebM (Opus) formatiga majburlash - eng yuqori zichlik va tezlik
       mediaRecorder = new MediaRecorder(studioStream, { mimeType: 'audio/webm;codecs=opus' });
       const sCtx = new AudioContext();
       const sSrc = sCtx.createMediaStreamSource(studioStream);
@@ -302,27 +317,22 @@ window.handleRecord = async () => {
   }
 };
 
-// --- OPTIMALLASHGAN YUKLASH (Tugmani bosganda darhol ishlaydi) ---
 window.uploadWithChunks = async () => {
   const name = document.getElementById('rec-name').value || "MRAI Recording";
   const upTxt = document.getElementById('up-txt');
   const upBar = document.getElementById('up-bar');
   
-  // UI-ni darhol ko'rsatish
   upTxt.style.display = 'block';
   upBar.style.width = "0%";
 
   const bytes = activeBlob.size;
   const sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
-  
-  // Bloklash hajmi (Pentium uchun 750KB optimal)
   const CHUNK_SIZE = 750 * 1024;
   const totalChunks = Math.ceil(bytes / CHUNK_SIZE);
 
   try {
     const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
 
-    // Faylni bo'laklab o'qish (Faqat kerakli qismni xotiraga oladi)
     for (let i = 0; i < totalChunks; i++) {
       const start = i * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, bytes);
@@ -334,21 +344,13 @@ window.uploadWithChunks = async () => {
         reader.readAsDataURL(slice);
       });
 
-      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { 
-        idx: i, 
-        data: base64Chunk 
-      });
-
-      // Progress bar yangilash
+      await addDoc(collection(db, `audios/${docRef.id}/chunks`), { idx: i, data: base64Chunk });
       const progress = Math.round(((i + 1) / totalChunks) * 100);
       upBar.style.width = progress + "%";
       document.getElementById('up-p').innerText = progress;
     }
     location.reload();
-  } catch (err) {
-    console.error(err);
-    alert("Xatolik yuz berdi!");
-  }
+  } catch (err) { console.error(err); alert("Xatolik!"); }
 };
 
 window.onFileSelect = (el) => { 
