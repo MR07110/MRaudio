@@ -17,7 +17,15 @@
   <div class="container">
     
     <section id="page-explore" class="page active">
-      <h1 class="header-title">MR AUDIO</h1>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 class="header-title" style="margin-bottom: 0;">MR AUDIO</h1>
+        
+        <button id="theme-toggle" class="btn-svg" onclick="toggleTheme()" style="border: 1px solid var(--text-sec); border-radius: 50%; padding: 8px; width: 45px; height: 45px; justify-content: center;">
+          <svg class="svg-icon" id="theme-icon" viewBox="0 0 24 24">
+            <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+          </svg>
+        </button>
+      </div>
       
       <div id="audio-list"></div>
       
@@ -31,7 +39,6 @@
       
       <div class="studio-box">
         <div id="studio-viz" class="studio-viz"></div>
-        
         <div id="timer" class="timer">00:00</div>
         
         <input type="text" id="rec-name" class="ios-input" placeholder="Yozuv nomini kiriting...">
@@ -48,7 +55,7 @@
             Bulutga saqlash
           </button>
           
-          <button onclick="document.getElementById('file-in').click()" style="color:var(--spotify-green); background:none; border:none; font-weight:600; font-size: 15px; cursor: pointer;">
+          <button onclick="document.getElementById('file-in').click()" style="color:var(--spotify-green); background:none; border:none; font-weight:600; font-size: 15px; cursor: pointer; margin-top: 10px;">
             Yoki fayl yuklash
           </button>
           <input type="file" id="file-in" hidden accept="audio/*" onchange="onFileSelect(this)">
@@ -68,7 +75,7 @@
     </button>
     <button class="nav-item" onclick="switchPage(this, 'page-studio')">
       <svg viewBox="0 0 24 24">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
       </svg>
       <span>Studio</span>
     </button>
