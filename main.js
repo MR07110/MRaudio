@@ -27,6 +27,14 @@ let lastVisibleDoc = null;
 let isFetchingList = false;
 let hasMoreDocs = true;
 
+// --- YORDAMCHI FUNKSIYA (VAQTNI FORMATLASH) ---
+const formatTime = (s) => {
+  if (!s || isNaN(s)) return "00:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+};
+
 // --- 0. NAVIGATSIYA ---
 window.switchPage = (btn, pageId) => {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -85,6 +93,7 @@ function renderCard(id, data) {
     <div class="waveform-visualizer" id="wf-${id}">
       ${Array(50).fill('<div class="w-bar"></div>').join('')}
     </div>
+    <div id="time-${id}" class="time-display" style="font-size: 11px; color: var(--text-sec); text-align: right; margin-bottom: 5px; font-family: monospace;">00:00 / 00:00</div>
     <div class="progress-box" id="pbox-${id}">
       <div class="progress-fill" id="pf-${id}"></div>
     </div>
@@ -99,7 +108,7 @@ function renderCard(id, data) {
     </div>
   `;
 
-  div.querySelector(`#play-btn-${id}`).onclick = (e) => window.playAudio(id, e.currentTarget);
+  div.querySelector(`#play-btn-${id}`).onclick = (e) => window.playAudio(id, e.currentTarget, data);
   div.querySelector(`#pbox-${id}`).onmousedown = (e) => window.playAudio.seek(e, id);
   div.querySelector(`#pbox-${id}`).ontouchstart = (e) => window.playAudio.seek(e, id);
   div.querySelector(`#loop-btn-${id}`).onclick = (e) => window.playAudio.toggleLoop(id, e.currentTarget);
@@ -111,12 +120,12 @@ function renderCard(id, data) {
 }
 
 // --- 2. PLEYER NAZORATI ---
-window.playAudio = async (id, btn) => {
+window.playAudio = async (id, btn, cardData) => {
   const icon = document.getElementById(`ic-${id}`);
   const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
   const fill = document.getElementById(`pf-${id}`);
+  const timeEl = document.getElementById(`time-${id}`);
 
-  // 1. Agar xuddi shu audio bosilsa (Pause/Play)
   if (currentPlayingId === id && currentAudio) {
     if (currentAudio.paused) {
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -130,7 +139,6 @@ window.playAudio = async (id, btn) => {
     return;
   }
 
-  // 2. Oldingi audioni to'xtatish va vizualni DEFAULT holatga keltirish
   if (currentAudio) { 
     currentAudio.pause(); 
     currentAudio.src = ""; 
@@ -138,25 +146,20 @@ window.playAudio = async (id, btn) => {
   }
 
   if (currentPlayingId) {
-    // Oldingi pleyer ikonkasi
     const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
-    if (oldIcon) {
-      oldIcon.style.display = "block";
-      oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
-    }
-    // Oldingi spinnerni o'chirish
+    if (oldIcon) oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
     const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
     if (oldSpin) oldSpin.remove();
-    // Oldingi progress va vizualizatsiyani DEFAULT qilish
     const oldFill = document.getElementById(`pf-${currentPlayingId}`);
     if (oldFill) oldFill.style.width = "0%";
+    const oldTime = document.getElementById(`time-${currentPlayingId}`);
+    if (oldTime) oldTime.innerText = "00:00 / 00:00";
     document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
       b.classList.remove('active'); 
       b.style.height = "5px"; 
     });
   }
 
-  // 3. Yangi audioni yuklashni boshlash
   const myToken = Date.now();
   lastLoadToken = myToken;
   currentPlayingId = id;
@@ -185,6 +188,24 @@ window.playAudio = async (id, btn) => {
     const data = new Uint8Array(analyzer.frequencyBinCount);
 
     audio.anz = analyzer; audio.dat = data;
+    
+    audio.onloadedmetadata = () => {
+      if (timeEl) timeEl.innerText = `00:00 / ${formatTime(audio.duration)}`;
+      
+      // MEDIA SESSION (Telefon bloklanganda boshqarish)
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: cardData.name || 'MRAI Audio',
+          artist: 'MR Audio Player',
+          artwork: [{ src: 'https://cdn-icons-png.flaticon.com/512/3659/3659744.png', sizes: '512x512', type: 'image/png' }]
+        });
+        navigator.mediaSession.setActionHandler('play', () => audio.play());
+        navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+        navigator.mediaSession.setActionHandler('seekbackward', () => audio.currentTime -= 10);
+        navigator.mediaSession.setActionHandler('seekforward', () => audio.currentTime += 10);
+      }
+    };
+
     if (spinner) spinner.remove();
     icon.style.display = 'block';
     icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
@@ -207,10 +228,24 @@ window.playAudio = async (id, btn) => {
 };
 
 function startViz(audio, analyzer, dataArray, id, bars, fill) {
+  const timeEl = document.getElementById(`time-${id}`);
+  let lastSec = -1;
+
   function draw() {
     if (!audio.paused && currentPlayingId === id) {
       requestAnimationFrame(draw);
       analyzer.getByteFrequencyData(dataArray);
+      
+      // VAQTNI YANGILASH + ANIMATSIYA
+      const currentSec = Math.floor(audio.currentTime);
+      if (timeEl && currentSec !== lastSec) {
+        lastSec = currentSec;
+        timeEl.innerText = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+        timeEl.classList.remove('time-update');
+        void timeEl.offsetWidth; // Reflow
+        timeEl.classList.add('time-update');
+      }
+
       const center = Math.floor(bars.length / 2);
       bars.forEach((b, i) => {
         const dist = Math.abs(i - center);
@@ -229,6 +264,7 @@ window.playAudio.seek = (e, id) => {
   if (currentPlayingId !== id || !currentAudio || !currentAudio.duration) return;
   const box = document.getElementById(`pbox-${id}`);
   const fill = document.getElementById(`pf-${id}`);
+  const timeEl = document.getElementById(`time-${id}`);
   
   const update = (clientX) => {
     const rect = box.getBoundingClientRect();
@@ -236,6 +272,9 @@ window.playAudio.seek = (e, id) => {
     p = Math.max(0, Math.min(1, p));
     fill.style.width = (p * 100) + "%";
     currentAudio.currentTime = p * currentAudio.duration;
+    if (timeEl) {
+      timeEl.innerText = `${formatTime(currentAudio.currentTime)} / ${formatTime(currentAudio.duration)}`;
+    }
   };
 
   const onMove = (me) => { isDragging = true; update(me.touches ? me.touches[0].clientX : me.clientX); };
