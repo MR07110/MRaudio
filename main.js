@@ -1,3 +1,4 @@
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getFirestore, collection, addDoc, query, orderBy, limit, startAfter, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
@@ -253,7 +254,7 @@ window.playAudio.toggleLoop = (id, btn) => { if (currentPlayingId === id && curr
 window.playAudio.download = async (id, name) => {
   const snap = await getDocs(query(collection(db, `audios/${id}/chunks`), orderBy("idx")));
   let b64 = ""; snap.forEach(c => b64 += c.data().data);
-  const a = document.createElement("a"); a.href = b64; a.download = name + ".webm"; a.click();
+  const a = document.createElement("a"); a.href = b64; a.download = name + ".mp3"; a.click();
 };
 
 // --- 4. STUDIO & RECORDING ---
@@ -291,7 +292,7 @@ window.handleRecord = async () => {
       chunks = [];
       mediaRecorder.ondataavailable = e => chunks.push(e.data);
       mediaRecorder.onstop = () => { 
-          activeBlob = new Blob(chunks, { type: 'audio/webm' }); 
+          activeBlob = new Blob(chunks, { type: 'audio/mp3' }); 
           document.getElementById('save-cloud').style.display = 'block';
           studioStream.getTracks().forEach(t => t.stop());
       };
