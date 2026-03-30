@@ -670,472 +670,367 @@
     <div class="modal" id="createRoomModal"><div class="modal-header">✨ Yangi xona yaratish</div><div class="form-group"><label>Xona nomi</label><input type="text" id="roomNameInput" class="form-input" placeholder="Masalan: Matematika 7-sinf"></div><div class="form-group"><label>Xona turi</label><div class="room-type-selector"><button class="type-btn active" data-type="public">🌍 Public</button><button class="type-btn" data-type="private">🔒 Private</button></div></div><div class="form-group" id="passwordGroup" style="display: none;"><label>Parol</label><input type="password" id="roomPassword" class="form-input" placeholder="Parol qo'yish"></div><div class="modal-actions"><button class="btn btn-ghost" id="cancelCreateBtn">Bekor</button><button class="btn btn-primary" id="confirmCreateBtn">Yaratish</button></div></div>
     <div class="modal" id="joinRoomModal"><div class="modal-header">🔐 Xona kod bilan kirish</div><div class="form-group"><label>Xona kodi</label><input type="text" id="joinCodeInput" class="form-input" placeholder="Masalan: ABC123" maxlength="6" style="text-transform: uppercase;"></div><div class="form-group" id="joinPasswordGroup" style="display: none;"><label>Parol</label><input type="password" id="joinPassword" class="form-input" placeholder="Xona paroli"></div><div class="modal-actions"><button class="btn btn-ghost" id="cancelJoinBtn">Bekor</button><button class="btn btn-primary" id="confirmJoinBtn">Kirish</button></div></div>
 
-    <script>
-        lucide.createIcons();
-
-        // ========== THEME ==========
-        function initTheme() {
-            const saved = localStorage.getItem('mrboard_theme') || 'light';
-            document.documentElement.setAttribute('data-theme', saved);
-            updateThemeUI(saved);
-        }
-        function updateThemeUI(theme) {
-            const icon = document.getElementById('themeIcon'), text = document.getElementById('themeText');
-            if (theme === 'dark') { icon.setAttribute('data-lucide', 'moon'); text.textContent = 'Dark'; }
-            else { icon.setAttribute('data-lucide', 'sun'); text.textContent = 'Light'; }
-            lucide.createIcons();
-        }
-        function toggleTheme() {
-            const current = document.documentElement.getAttribute('data-theme');
-            const newTheme = current === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('mrboard_theme', newTheme);
-            updateThemeUI(newTheme);
-            showToast(newTheme === 'dark' ? '🌙 Dark mode yoqildi' : '☀️ Light mode yoqildi', 'success');
-        }
-        document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
-        initTheme();
-
-        // ========== FIREBASE ==========
-        const firebaseConfig = {
-            apiKey: "AIzaSyDAsbqgXxl69P-yhOn3L2puTBmLxG70Ao0",
-            authDomain: "basic-formula-484419-k8.firebaseapp.com",
-            databaseURL: "https://basic-formula-484419-k8-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "basic-formula-484419-k8",
-            storageBucket: "basic-formula-484419-k8.firebasestorage.app",
-            messagingSenderId: "629679926764",
-            appId: "1:629679926764:web:0cff483e9c4752fbd024c9"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-
-        let currentUser = null, currentAvatar = null, allRooms = [], searchQuery = '', editingRoomId = null;
-        const userCache = new Map();
-
-        async function getUserData(uid) {
-            if (userCache.has(uid)) return userCache.get(uid);
-            const snap = await db.ref(`users/${uid}`).once('value');
-            const data = snap.val() || {};
-            userCache.set(uid, data);
-            return data;
-        }
-
-        // ========== TAB SWITCH ==========
-        function switchTab(tabId) {
-            document.querySelectorAll('.section-page').forEach(s => s.classList.remove('active'));
-            const target = document.getElementById(`${tabId}Section`);
-            if (target) target.classList.add('active');
+   <script type="module">
+    // ========== MUSIQA PLAYER MODULE ==========
+    // Bu kod musiqa tugaganda, agar takrorlash rejimi yoqilmagan bo'lsa,
+    // avtomatik ravishda random keyingi musiqaga o'tadi
+    
+    class MusicPlayer {
+        constructor() {
+            this.playlist = [];
+            this.currentTrackIndex = 0;
+            this.isPlaying = false;
+            this.isRepeat = false;      // Takrorlash rejimi (default: false)
+            this.isShuffle = false;      // Random rejimi
+            this.audio = new Audio();
+            this.currentTime = 0;
+            this._lastTrackIndex = -1;
             
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            const activeTab = document.querySelector(`.tab-item[data-tab="${tabId}"]`);
-            if (activeTab) activeTab.classList.add('active');
+            this.initEventListeners();
+        }
+        
+        initEventListeners() {
+            // Musiqa tugaganda
+            this.audio.addEventListener('ended', () => {
+                console.log('[Player] Musiqa tugadi');
+                
+                if (!this.isRepeat) {
+                    // Takrorlash rejimi YO'Q => random keyingi musiqa
+                    this.playNextRandom();
+                } else {
+                    // Takrorlash rejimi YOQILGAN => xuddi shu musiqani takrorla
+                    this.playCurrentTrack();
+                }
+            });
             
-            if (tabId === 'home') loadPublicRooms();
-            if (tabId === 'myrooms') loadMyRooms();
-            if (tabId === 'profile') loadProfile();
-        }
-
-        // ========== PUBLIC ROOMS ==========
-        async function loadPublicRooms() {
-            const container = document.getElementById('roomsList');
-            container.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
-            try {
-                const snap = await db.ref('rooms').once('value');
-                const rooms = snap.val() || {};
-                allRooms = Object.entries(rooms)
-                    .filter(([id, r]) => r.isActive !== false && r.isPublic === true)
-                    .sort((a, b) => b[1].createdAt - a[1].createdAt)
-                    .map(([id, r]) => ({ id, ...r }));
-                renderPublicRooms();
-            } catch(e) { container.innerHTML = '<div class="empty-state">❌ Xatolik</div>'; }
-        }
-
-        function filterRooms(rooms) {
-            if (!searchQuery) return rooms;
-            const q = searchQuery.toLowerCase();
-            return rooms.filter(r => r.name?.toLowerCase().includes(q) || r.createdByName?.toLowerCase().includes(q) || r.id?.toLowerCase().includes(q));
-        }
-
-        async function renderPublicRooms() {
-            const container = document.getElementById('roomsList');
-            const filtered = filterRooms(allRooms);
-            if (filtered.length === 0) { container.innerHTML = '<div class="empty-state">🔍 Hech narsa topilmadi</div>'; return; }
-            let html = '';
-            for (const room of filtered) {
-                const userData = await getUserData(room.createdBy);
-                const avatarLetter = (userData.fullName || userData.username || 'U').charAt(0).toUpperCase();
-                const userCount = room.users ? Object.keys(room.users).length : 0;
-                const avatarStyle = userData.avatarBase64 ? `background-image: url('${userData.avatarBase64}'); background-size: cover;` : `background-color: var(--brand-primary);`;
-                html += `<div class="room-card">
-                    <div class="room-card-header">
-                        <span class="room-name">${escapeHtml(room.name || 'Nomsiz xona')}</span>
-                        <span class="room-badge ${userCount > 0 ? 'active' : ''}">${userCount > 0 ? '🟢 Faol' : '⚫ Faol emas'}</span>
-                    </div>
-                    <div class="creator-info">
-                        <div class="creator-avatar" onclick="event.stopPropagation(); showUserProfile('${room.createdBy}')" style="${avatarStyle}">${!userData.avatarBase64 ? avatarLetter : ''}</div>
-                        <span class="creator-name" onclick="event.stopPropagation(); showUserProfile('${room.createdBy}')">${escapeHtml(userData.fullName || userData.username || room.createdByName || 'Foydalanuvchi')}</span>
-                    </div>
-                    <div class="room-meta">
-                        <span>👥 ${userCount} kishi</span>
-                        <span>📅 ${new Date(room.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <button class="room-btn room-join-btn" onclick="goToRoom('${room.id}')">Kirish →</button>
-                </div>`;
-            }
-            container.innerHTML = html;
-            lucide.createIcons();
-        }
-
-        // ========== MY ROOMS (filter by current user) ==========
-        async function loadMyRooms() {
-            if (!currentUser) return;
-            const container = document.getElementById('myRoomsList');
-            container.innerHTML = '<div class="empty-state">Yuklanmoqda...</div>';
-            try {
-                const snap = await db.ref('rooms').once('value');
-                const rooms = snap.val() || {};
-                // FILTER: faqat currentUser.uid ga tegishli xonalar
-                const myRoomsArray = Object.entries(rooms)
-                    .filter(([id, r]) => r.isActive !== false && r.createdBy === currentUser.uid)
-                    .sort((a, b) => b[1].createdAt - a[1].createdAt)
-                    .map(([id, r]) => ({ id, ...r }));
-                
-                if (myRoomsArray.length === 0) {
-                    container.innerHTML = '<div class="empty-state">⭐ Siz hali xona yaratmagansiz<br><button class="quick-action create" id="emptyCreateBtn" style="margin-top: 16px;"><i data-lucide="plus-circle"></i> Birinchi xonani yarating</button></div>';
-                    const emptyBtn = document.getElementById('emptyCreateBtn');
-                    if (emptyBtn) emptyBtn.addEventListener('click', openCreateModal);
-                    lucide.createIcons();
-                    return;
-                }
-                
-                let html = '';
-                for (const room of myRoomsArray) {
-                    const userCount = room.users ? Object.keys(room.users).length : 0;
-                    html += `<div class="room-card">
-                        <div class="room-card-header">
-                            <span class="room-name">${escapeHtml(room.name || 'Nomsiz xona')}</span>
-                            <span class="room-badge ${room.isPublic ? '' : 'private'}">${room.isPublic ? '🌍 Public' : '🔒 Private'}</span>
-                        </div>
-                        <div class="creator-info">
-                            <div class="creator-avatar" style="background: var(--brand-primary);">${(currentUser.displayName || 'U').charAt(0).toUpperCase()}</div>
-                            <span class="creator-name">Siz</span>
-                        </div>
-                        <div class="room-meta">
-                            <span>👥 ${userCount} kishi</span>
-                            <span>📅 ${new Date(room.createdAt).toLocaleDateString()}</span>
-                            <span>${room.hasPassword ? '🔒 Parol bor' : '🔓 Parolsiz'}</span>
-                        </div>
-                        <div class="room-actions">
-                            <button class="room-btn room-join-btn" onclick="goToRoom('${room.id}')">Kirish →</button>
-                            <button class="room-btn room-edit-btn" onclick="openEditRoom('${room.id}', '${escapeHtml(room.name)}', ${room.isPublic}, '${room.password || ''}')">✏️ Tahrirlash</button>
-                            <button class="room-btn room-delete-btn" onclick="deleteRoom('${room.id}', '${escapeHtml(room.name)}')">🗑 O'chirish</button>
-                        </div>
-                    </div>`;
-                }
-                container.innerHTML = html;
-                lucide.createIcons();
-            } catch(e) {
-                console.error(e);
-                container.innerHTML = '<div class="empty-state">❌ Xatolik yuz berdi</div>';
-            }
-        }
-
-        // ========== EDIT ROOM ==========
-        function openEditRoom(roomId, roomName, isPublic, password) {
-            editingRoomId = roomId;
-            document.getElementById('editRoomName').value = roomName;
-            if (isPublic) {
-                document.getElementById('editPublicBtn').classList.add('active');
-                document.getElementById('editPrivateBtn').classList.remove('active');
-                document.getElementById('editPasswordGroup').style.display = 'none';
-            } else {
-                document.getElementById('editPrivateBtn').classList.add('active');
-                document.getElementById('editPublicBtn').classList.remove('active');
-                document.getElementById('editPasswordGroup').style.display = 'block';
-                document.getElementById('editRoomPassword').value = password;
-            }
-            document.getElementById('editRoomModal').classList.add('active');
-            document.getElementById('modalOverlay').classList.add('active');
-        }
-
-        async function saveEditRoom() {
-            if (!editingRoomId) return;
-            const newName = document.getElementById('editRoomName').value.trim();
-            if (!newName) { showToast('Xona nomini kiriting!', 'error'); return; }
-            const isPublic = document.getElementById('editPublicBtn').classList.contains('active');
-            const newPassword = document.getElementById('editRoomPassword').value;
-            await db.ref(`rooms/${editingRoomId}`).update({
-                name: newName,
-                isPublic: isPublic,
-                hasPassword: !isPublic && newPassword ? true : false,
-                password: !isPublic ? newPassword || null : null
+            // Xatolik bo'lsa ham random keyingi musiqaga o'tish
+            this.audio.addEventListener('error', (e) => {
+                console.error('[Player] Musiqa xatosi:', e);
+                this.playNextRandom();
             });
-            closeEditModal();
-            showToast('✅ Xona yangilandi!', 'success');
-            loadMyRooms();
-            loadPublicRooms();
-        }
-
-        async function deleteRoom(roomId, roomName) {
-            if (confirm(`"${roomName}" xonasini o'chirishni xohlaysizmi? Bu amal qaytarilmaydi!`)) {
-                await db.ref(`rooms/${roomId}`).update({ isActive: false });
-                showToast(`❌ "${roomName}" xonasi o'chirildi`, 'success');
-                loadMyRooms();
-                loadPublicRooms();
-            }
-        }
-
-        function closeEditModal() {
-            document.getElementById('editRoomModal').classList.remove('active');
-            document.getElementById('modalOverlay').classList.remove('active');
-            editingRoomId = null;
-        }
-
-        // ========== PROFILE ==========
-        async function loadProfile() {
-            if (!currentUser) return;
-            const snap = await db.ref(`users/${currentUser.uid}`).once('value');
-            const data = snap.val() || {};
-            document.getElementById('profileFullname').value = data.fullName || '';
-            document.getElementById('profileLastname').value = data.lastName || '';
-            document.getElementById('profileUsername').value = data.username || currentUser.email?.split('@')[0] || '';
-            document.getElementById('profileEmail').value = currentUser.email || '';
-            document.getElementById('profileBio').value = data.bio || '';
-            currentAvatar = data.avatarBase64 || null;
-            updateAvatarUI(currentAvatar, data.fullName || currentUser.displayName);
-        }
-
-        function updateAvatarUI(avatar, name) {
-            const avatarDiv = document.getElementById('userAvatar');
-            const profileAvatar = document.getElementById('profileAvatar');
-            const letter = (name || 'U').charAt(0).toUpperCase();
-            if (avatar && avatar.startsWith('data:image')) {
-                avatarDiv.style.backgroundImage = `url(${avatar})`;
-                avatarDiv.style.backgroundSize = 'cover';
-                avatarDiv.innerHTML = '';
-                profileAvatar.style.backgroundImage = `url(${avatar})`;
-                profileAvatar.style.backgroundSize = 'cover';
-                profileAvatar.innerHTML = '';
-            } else {
-                avatarDiv.style.backgroundImage = 'none';
-                avatarDiv.style.backgroundColor = 'var(--brand-primary)';
-                avatarDiv.innerHTML = letter;
-                profileAvatar.style.backgroundImage = 'none';
-                profileAvatar.style.backgroundColor = 'var(--brand-primary)';
-                profileAvatar.innerHTML = `<span>${letter}</span>`;
-            }
-        }
-
-        async function saveProfile() {
-            if (!currentUser) return;
-            const fullName = document.getElementById('profileFullname').value.trim();
-            const lastName = document.getElementById('profileLastname').value.trim();
-            const username = document.getElementById('profileUsername').value.trim();
-            const bio = document.getElementById('profileBio').value.trim();
-            const updateData = { fullName, lastName, username, bio, updatedAt: Date.now() };
-            if (currentAvatar) updateData.avatarBase64 = currentAvatar;
-            await db.ref(`users/${currentUser.uid}`).update(updateData);
-            if (fullName) await currentUser.updateProfile({ displayName: fullName });
-            showToast('✅ Profil saqlandi!', 'success');
-            loadProfile();
-            document.getElementById('userName').textContent = username || fullName || currentUser.email?.split('@')[0];
-        }
-
-        document.getElementById('avatarInput')?.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                currentAvatar = ev.target.result;
-                updateAvatarUI(currentAvatar, document.getElementById('profileFullname').value);
-                showToast('Avatar yangilandi. Saqlash tugmasini bosing!', 'success');
-            };
-            reader.readAsDataURL(file);
-        });
-
-        // ========== USER PROFILE MODAL ==========
-        let currentProfileUser = null;
-        async function showUserProfile(uid) {
-            currentProfileUser = await getUserData(uid);
-            const modal = document.getElementById('userProfileModal');
-            const avatarDiv = document.getElementById('modalAvatar');
-            if (currentProfileUser.avatarBase64) {
-                avatarDiv.style.backgroundImage = `url(${currentProfileUser.avatarBase64})`;
-                avatarDiv.style.backgroundSize = 'cover';
-                avatarDiv.innerHTML = '';
-            } else {
-                avatarDiv.style.backgroundImage = 'none';
-                avatarDiv.style.backgroundColor = 'var(--brand-primary)';
-                avatarDiv.innerHTML = `<span>${(currentProfileUser.fullName || currentProfileUser.username || 'U').charAt(0).toUpperCase()}</span>`;
-            }
-            document.getElementById('modalFullname').textContent = currentProfileUser.fullName || 'Ism kiritilmagan';
-            document.getElementById('modalUsername').textContent = `@${currentProfileUser.username || 'username'}`;
-            document.getElementById('modalBio').textContent = currentProfileUser.bio || 'Bio mavjud emas';
-            modal.classList.add('active');
-        }
-
-        function showLargeAvatar() {
-            if (!currentProfileUser || !currentProfileUser.avatarBase64) { showToast('Rasm mavjud emas', 'error'); return; }
-            const modal = document.getElementById('avatarModal');
-            const img = document.getElementById('largeAvatarImg');
-            img.src = currentProfileUser.avatarBase64;
-            modal.classList.add('active');
-        }
-        function closeLargeAvatar() { document.getElementById('avatarModal').classList.remove('active'); }
-        function closeUserProfile() { document.getElementById('userProfileModal').classList.remove('active'); currentProfileUser = null; }
-
-        // ========== ROOM ACTIONS ==========
-        function goToRoom(roomId) {
-            localStorage.setItem('lastRoomId', roomId);
-            window.location.href = `board.html?room=${roomId}`;
-        }
-
-        // ========== CREATE ROOM ==========
-        let roomType = 'public';
-        async function createRoom() {
-            const name = document.getElementById('roomNameInput').value.trim();
-            if (!name) { showToast('Xona nomini kiriting!', 'error'); return; }
-            const password = document.getElementById('roomPassword').value;
-            const roomCode = Math.random().toString(36).substr(2, 6).toUpperCase();
-            const teacherSecret = Math.random().toString(36).substr(2, 16);
-            const userData = await getUserData(currentUser.uid);
-            await db.ref(`rooms/${roomCode}`).set({
-                name, createdBy: currentUser.uid,
-                createdByName: userData.fullName || userData.username || currentUser.email?.split('@')[0],
-                createdAt: Date.now(), isPublic: roomType === 'public',
-                hasPassword: roomType === 'private' && password ? true : false,
-                password: roomType === 'private' ? password || null : null,
-                isActive: true, teacherSecret, elements: {}
+            
+            // Vaqt yangilanganda
+            this.audio.addEventListener('timeupdate', () => {
+                if (this.onTimeUpdate) {
+                    this.onTimeUpdate(this.audio.currentTime, this.audio.duration);
+                }
             });
-            closeModals();
-            showToast(`✅ "${name}" xonasi yaratildi! Kod: ${roomCode}`, 'success');
-            loadMyRooms();
-            setTimeout(() => goToRoom(roomCode), 1000);
         }
-
-        // ========== JOIN ROOM ==========
-        async function confirmJoin() {
-            const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
-            if (!code) { showToast('Xona kodini kiriting!', 'error'); return; }
-            const password = document.getElementById('joinPassword').value;
-            const snap = await db.ref(`rooms/${code}`).once('value');
-            const room = snap.val();
-            if (!room) { showToast('Xona topilmadi!', 'error'); return; }
-            if (room.hasPassword && room.password !== password) { showToast('Parol noto\'g\'ri!', 'error'); return; }
-            closeModals();
-            goToRoom(code);
-        }
-
-        // ========== MODALS ==========
-        function openCreateModal() {
-            document.getElementById('roomNameInput').value = '';
-            document.getElementById('roomPassword').value = '';
-            document.getElementById('passwordGroup').style.display = 'none';
-            document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector('.type-btn[data-type="public"]')?.classList.add('active');
-            roomType = 'public';
-            document.getElementById('createRoomModal').classList.add('active');
-            document.getElementById('modalOverlay').classList.add('active');
-        }
-        function openJoinModal() {
-            document.getElementById('joinCodeInput').value = '';
-            document.getElementById('joinPassword').value = '';
-            document.getElementById('joinPasswordGroup').style.display = 'none';
-            document.getElementById('joinRoomModal').classList.add('active');
-            document.getElementById('modalOverlay').classList.add('active');
-        }
-        function closeModals() {
-            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-            document.getElementById('modalOverlay').classList.remove('active');
-        }
-
-        function showToast(msg, type) {
-            const container = document.getElementById('toastWrapper');
-            const toast = document.createElement('div');
-            toast.className = `toast-item`;
-            toast.innerHTML = `<span>${msg}</span>`;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
-        }
-
-        // ========== EVENT LISTENERS ==========
-        document.getElementById('searchInput')?.addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            if (document.getElementById('homeSection').classList.contains('active')) renderPublicRooms();
-        });
-        document.getElementById('quickCreateBtn')?.addEventListener('click', openCreateModal);
-        document.getElementById('quickJoinBtn')?.addEventListener('click', openJoinModal);
-        document.getElementById('cancelCreateBtn')?.addEventListener('click', closeModals);
-        document.getElementById('confirmCreateBtn')?.addEventListener('click', createRoom);
-        document.getElementById('cancelJoinBtn')?.addEventListener('click', closeModals);
-        document.getElementById('confirmJoinBtn')?.addEventListener('click', confirmJoin);
-        document.getElementById('refreshRoomsBtn')?.addEventListener('click', () => { if (document.getElementById('homeSection').classList.contains('active')) loadPublicRooms(); });
-        document.getElementById('refreshMyRoomsBtn')?.addEventListener('click', () => { if (document.getElementById('myRoomsSection').classList.contains('active')) loadMyRooms(); });
-        document.getElementById('saveProfileBtn')?.addEventListener('click', saveProfile);
-        document.getElementById('logoutBtn')?.addEventListener('click', () => auth.signOut());
-        document.getElementById('modalOverlay')?.addEventListener('click', closeModals);
-        document.getElementById('currentUserInfo')?.addEventListener('click', () => switchTab('profile'));
-        document.getElementById('cancelEditBtn')?.addEventListener('click', closeEditModal);
-        document.getElementById('saveEditBtn')?.addEventListener('click', saveEditRoom);
         
-        document.getElementById('editPublicBtn')?.addEventListener('click', () => {
-            document.getElementById('editPublicBtn').classList.add('active');
-            document.getElementById('editPrivateBtn').classList.remove('active');
-            document.getElementById('editPasswordGroup').style.display = 'none';
-        });
-        document.getElementById('editPrivateBtn')?.addEventListener('click', () => {
-            document.getElementById('editPrivateBtn').classList.add('active');
-            document.getElementById('editPublicBtn').classList.remove('active');
-            document.getElementById('editPasswordGroup').style.display = 'block';
-        });
-        
-        document.querySelectorAll('.type-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                roomType = btn.dataset.type;
-                document.getElementById('passwordGroup').style.display = roomType === 'private' ? 'block' : 'none';
-            };
-        });
-        
-        document.querySelectorAll('.tab-item').forEach(tab => {
-            tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-        });
-
-        // ========== AUTH ==========
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                currentUser = user;
-                const snap = await db.ref(`users/${user.uid}`).once('value');
-                const data = snap.val() || {};
-                const username = data.username || user.email?.split('@')[0] || 'User';
-                const fullName = data.fullName || username;
-                document.getElementById('userName').textContent = username;
-                document.getElementById('welcomeMessage').textContent = `Assalomu alaykum, ${fullName}!`;
-                updateAvatarUI(data.avatarBase64, fullName);
-                loadPublicRooms();
-                loadMyRooms();
-                loadProfile();
-                lucide.createIcons();
-            } else {
-                window.location.href = 'board.html';
+        // Playlistni o'rnatish
+        setPlaylist(songs) {
+            if (!Array.isArray(songs)) return;
+            this.playlist = songs;
+            console.log(`[Player] Playlist yangilandi: ${this.playlist.length} ta musiqa`);
+            if (this.onPlaylistUpdate) {
+                this.onPlaylistUpdate(this.playlist);
             }
-        });
-
-        window.goToRoom = goToRoom;
-        window.switchTab = switchTab;
-        window.showUserProfile = showUserProfile;
-        window.closeUserProfile = closeUserProfile;
-        window.showLargeAvatar = showLargeAvatar;
-        window.closeLargeAvatar = closeLargeAvatar;
-        window.openEditRoom = openEditRoom;
-        window.deleteRoom = deleteRoom;
-    </script>
+        }
+        
+        // Musiqa qo'shish
+        addTrack(track) {
+            if (!track || !track.url) return;
+            this.playlist.push(track);
+            console.log(`[Player] Yangi musiqa qo'shildi: ${track.title}`);
+            if (this.onPlaylistUpdate) {
+                this.onPlaylistUpdate(this.playlist);
+            }
+        }
+        
+        // Random keyingi musiqaga o'tish (asosiy funksiya)
+        playNextRandom() {
+            if (this.playlist.length === 0) {
+                console.warn('[Player] Playlist bo\'sh');
+                return;
+            }
+            
+            let nextIndex;
+            
+            if (this.isShuffle) {
+                // Random rejimi yoqilgan: butunlay random
+                do {
+                    nextIndex = Math.floor(Math.random() * this.playlist.length);
+                } while (nextIndex === this.currentTrackIndex && this.playlist.length > 1);
+            } else {
+                // Random rejimi yo'q: hozirgi musiqadan boshqa random
+                if (this.playlist.length === 1) {
+                    nextIndex = 0;
+                } else {
+                    nextIndex = Math.floor(Math.random() * (this.playlist.length - 1));
+                    if (nextIndex >= this.currentTrackIndex) nextIndex++;
+                }
+            }
+            
+            this.currentTrackIndex = nextIndex;
+            this.playCurrentTrack();
+            
+            const track = this.playlist[this.currentTrackIndex];
+            console.log(`[Player] Random keyingi musiqa: ${track?.title || 'Noma\'lum'}`);
+        }
+        
+        // Keyingi musiqaga o'tish
+        playNext() {
+            if (this.playlist.length === 0) return;
+            
+            if (this.isShuffle) {
+                let nextIndex;
+                do {
+                    nextIndex = Math.floor(Math.random() * this.playlist.length);
+                } while (nextIndex === this.currentTrackIndex && this.playlist.length > 1);
+                this.currentTrackIndex = nextIndex;
+            } else {
+                this.currentTrackIndex = (this.currentTrackIndex + 1) % this.playlist.length;
+            }
+            
+            this.playCurrentTrack();
+        }
+        
+        // Oldingi musiqaga o'tish
+        playPrevious() {
+            if (this.playlist.length === 0) return;
+            
+            if (this.isShuffle) {
+                let prevIndex;
+                do {
+                    prevIndex = Math.floor(Math.random() * this.playlist.length);
+                } while (prevIndex === this.currentTrackIndex && this.playlist.length > 1);
+                this.currentTrackIndex = prevIndex;
+            } else {
+                this.currentTrackIndex = (this.currentTrackIndex - 1 + this.playlist.length) % this.playlist.length;
+            }
+            
+            this.playCurrentTrack();
+        }
+        
+        // Hozirgi musiqani o'ynatish
+        playCurrentTrack() {
+            if (this.playlist.length === 0) {
+                console.warn('[Player] Playlist bo\'sh');
+                return;
+            }
+            
+            const track = this.playlist[this.currentTrackIndex];
+            if (!track || !track.url) {
+                console.error('[Player] Musiqa URL topilmadi');
+                this.playNextRandom();
+                return;
+            }
+            
+            this._lastTrackIndex = this.currentTrackIndex;
+            this.audio.src = track.url;
+            this.audio.load();
+            
+            if (this.currentTime > 0 && this.currentTrackIndex === this._lastTrackIndex) {
+                this.audio.currentTime = this.currentTime;
+            } else {
+                this.currentTime = 0;
+            }
+            
+            this.audio.play().catch(e => {
+                console.error('[Player] Musiqa o\'ynatilmadi:', e);
+            });
+            
+            this.isPlaying = true;
+            
+            if (this.onTrackChange) {
+                this.onTrackChange(track, this.currentTrackIndex);
+            }
+            if (this.onPlayStateChange) {
+                this.onPlayStateChange(true);
+            }
+            
+            console.log(`[Player] ▶️ O'ynatilmoqda: ${track.title} - ${track.artist || 'Noma\'lum'}`);
+        }
+        
+        // To'xtatish
+        pause() {
+            this.audio.pause();
+            this.isPlaying = false;
+            if (this.onPlayStateChange) {
+                this.onPlayStateChange(false);
+            }
+        }
+        
+        // Davom ettirish
+        play() {
+            this.audio.play();
+            this.isPlaying = true;
+            if (this.onPlayStateChange) {
+                this.onPlayStateChange(true);
+            }
+        }
+        
+        // Play/Pause
+        togglePlay() {
+            if (this.isPlaying) {
+                this.pause();
+            } else {
+                this.play();
+            }
+        }
+        
+        // Ovoz balandligi (0-1)
+        setVolume(volume) {
+            const vol = Math.max(0, Math.min(1, volume));
+            this.audio.volume = vol;
+            if (this.onVolumeChange) {
+                this.onVolumeChange(vol);
+            }
+        }
+        
+        // Vaqtni o'zgartirish
+        seekTo(time) {
+            if (time >= 0 && time <= this.audio.duration) {
+                this.audio.currentTime = time;
+                this.currentTime = time;
+            }
+        }
+        
+        // Takrorlash rejimini o'zgartirish
+        toggleRepeat() {
+            this.isRepeat = !this.isRepeat;
+            console.log(`[Player] Takrorlash rejimi: ${this.isRepeat ? 'YOQILDI' : 'O\'CHIRILDI'}`);
+            if (this.onRepeatChange) {
+                this.onRepeatChange(this.isRepeat);
+            }
+            return this.isRepeat;
+        }
+        
+        // Random rejimini o'zgartirish
+        toggleShuffle() {
+            this.isShuffle = !this.isShuffle;
+            console.log(`[Player] Random rejimi: ${this.isShuffle ? 'YOQILDI' : 'O\'CHIRILDI'}`);
+            if (this.onShuffleChange) {
+                this.onShuffleChange(this.isShuffle);
+            }
+            return this.isShuffle;
+        }
+        
+        // Hozirgi musiqani olish
+        getCurrentTrack() {
+            return this.playlist[this.currentTrackIndex] || null;
+        }
+        
+        // Playlistni tozalash
+        clearPlaylist() {
+            this.playlist = [];
+            this.currentTrackIndex = 0;
+            this.audio.pause();
+            this.audio.src = '';
+            this.isPlaying = false;
+            console.log('[Player] Playlist tozalandi');
+            if (this.onPlaylistUpdate) {
+                this.onPlaylistUpdate(this.playlist);
+            }
+        }
+        
+        // Callback funksiyalar
+        onTrackChange(callback) { this.onTrackChange = callback; }
+        onTimeUpdate(callback) { this.onTimeUpdate = callback; }
+        onPlayStateChange(callback) { this.onPlayStateChange = callback; }
+        onVolumeChange(callback) { this.onVolumeChange = callback; }
+        onRepeatChange(callback) { this.onRepeatChange = callback; }
+        onShuffleChange(callback) { this.onShuffleChange = callback; }
+        onPlaylistUpdate(callback) { this.onPlaylistUpdate = callback; }
+    }
+    
+    // ========== PLAYER OBYEKTINI YARATISH ==========
+    const player = new MusicPlayer();
+    
+    // ========== MISOL: PLAYLIST (O'Z MUSIQALARINGIZ BILAN ALMASHTIRING) ==========
+    const examplePlaylist = [
+        { id: 1, title: "Musiqa 1", artist: "Artist 1", url: "https://example.com/music1.mp3", duration: 180 },
+        { id: 2, title: "Musiqa 2", artist: "Artist 2", url: "https://example.com/music2.mp3", duration: 210 },
+        { id: 3, title: "Musiqa 3", artist: "Artist 3", url: "https://example.com/music3.mp3", duration: 195 },
+        { id: 4, title: "Musiqa 4", artist: "Artist 4", url: "https://example.com/music4.mp3", duration: 225 },
+    ];
+    
+    // Playlistni o'rnatish
+    player.setPlaylist(examplePlaylist);
+    
+    // ========== UI CALLBACKLAR (O'Z UI ELEMENTLARINGIZGA MOSLANG) ==========
+    player.onTrackChange((track, index) => {
+        console.log(`🎵 Endi: ${track.title} (${index + 1}/${player.playlist.length})`);
+        // UI yangilash:
+        // const titleEl = document.getElementById('current-song-title');
+        // if (titleEl) titleEl.textContent = track.title;
+        // const artistEl = document.getElementById('current-song-artist');
+        // if (artistEl) artistEl.textContent = track.artist || '';
+    });
+    
+    player.onTimeUpdate((currentTime, duration) => {
+        const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+        // Progress barni yangilash:
+        // const progressBar = document.getElementById('progress-bar-fill');
+        // if (progressBar) progressBar.style.width = `${progressPercent}%`;
+        // const currentTimeEl = document.getElementById('current-time');
+        // if (currentTimeEl) currentTimeEl.textContent = formatTime(currentTime);
+        // const durationEl = document.getElementById('duration');
+        // if (durationEl) durationEl.textContent = formatTime(duration);
+    });
+    
+    player.onPlayStateChange((isPlaying) => {
+        console.log(`Player state: ${isPlaying ? '▶️ O\'ynatilmoqda' : '⏸ To\'xtatilgan'}`);
+        // Play/Pause tugmasini yangilash:
+        // const playBtn = document.getElementById('play-pause-btn');
+        // if (playBtn) playBtn.innerHTML = isPlaying ? '⏸' : '▶';
+    });
+    
+    player.onRepeatChange((isRepeat) => {
+        console.log(`Repeat mode: ${isRepeat ? 'ON' : 'OFF'}`);
+        // Repeat tugmasini yangilash:
+        // const repeatBtn = document.getElementById('repeat-btn');
+        // if (repeatBtn) repeatBtn.classList.toggle('active', isRepeat);
+    });
+    
+    player.onShuffleChange((isShuffle) => {
+        console.log(`Shuffle mode: ${isShuffle ? 'ON' : 'OFF'}`);
+        // Shuffle tugmasini yangilash:
+        // const shuffleBtn = document.getElementById('shuffle-btn');
+        // if (shuffleBtn) shuffleBtn.classList.toggle('active', isShuffle);
+    });
+    
+    // Vaqtni formatlash uchun yordamchi funksiya
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // ========== PLAYERNI GLOBAL QILISH (ixtiyoriy) ==========
+    window.musicPlayer = player;
+    window.formatTime = formatTime;
+    
+    // ========== TUGMALAR UCHUN EVENT LISTENERLAR (O'Z TUGMALARINGIZGA MOSLANG) ==========
+    // Agar sahifangizda tugmalar mavjud bo'lsa, ularni shu yerda bog'lang:
+    /*
+    document.getElementById('play-pause-btn')?.addEventListener('click', () => player.togglePlay());
+    document.getElementById('next-btn')?.addEventListener('click', () => player.playNext());
+    document.getElementById('prev-btn')?.addEventListener('click', () => player.playPrevious());
+    document.getElementById('repeat-btn')?.addEventListener('click', () => player.toggleRepeat());
+    document.getElementById('shuffle-btn')?.addEventListener('click', () => player.toggleShuffle());
+    document.getElementById('volume-slider')?.addEventListener('input', (e) => player.setVolume(e.target.value / 100));
+    document.getElementById('progress-bar')?.addEventListener('click', (e) => {
+        const progressBar = e.currentTarget;
+        const rect = progressBar.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percent = clickX / rect.width;
+        const duration = player.audio.duration;
+        if (duration) player.seekTo(percent * duration);
+    });
+    */
+    
+    // Musiqani random boshlash (agar playlist bo'sh bo'lmasa)
+    if (player.playlist.length > 0) {
+        // Random boshlash uchun:
+        const randomIndex = Math.floor(Math.random() * player.playlist.length);
+        player.currentTrackIndex = randomIndex;
+        // player.playCurrentTrack();  // Agar avtomatik o'ynasin desangiz
+    }
+    
+    console.log('🎵 Music Player module loaded successfully!');
+    console.log('💡 Asosiy xususiyat: Musiqa tugaganda random keyingi musiqaga o\'tish (agar takrorlash rejimi yoqilmagan bo\'lsa)');
+</script>
 </body>
 </html>
