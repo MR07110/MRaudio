@@ -353,368 +353,544 @@
 </head>
 <body>
 
+  <script>
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.body.classList.add('dark-theme');
+    }
+  </script>
+
+  <div id="up-bar"></div>
+  <div id="up-txt">Saqlanmoqda... <span id="up-p">0</span>%</div>
+
+  <div class="container">
+    
+    <section id="page-explore" class="page active">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+        <h1 class="header-title" style="margin-bottom: 0;">MR MUSIC</h1>
+        
+        <button id="theme-toggle" class="btn-svg" onclick="toggleTheme()">
+          <svg class="svg-icon" id="theme-icon" viewBox="0 0 24 24"></svg>
+        </button>
+      </div>
+      
+      <div id="audio-list"></div>
+      
+      <div id="load-more-indicator" style="text-align:center; padding: 20px; display:none; color: var(--text-sec); font-size: 12px;">
+        Yuklanmoqda...
+      </div>
+    </section>
+
+    <section id="page-studio" class="page">
+      <h1 class="header-title">Audio qo'shish</h1>
+      
+      <div class="studio-box">
+        <div id="studio-viz" class="studio-viz"></div>
+        <div id="timer" class="timer">00:00</div>
+        
+        <input type="text" id="rec-name" class="ios-input" placeholder="Yozuv nomini kiriting...">
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; align-items: center;">
+          
+          <button id="rec-trigger" class="btn-svg btn-play" style="border-color: var(--ios-red);" onclick="handleRecord()">
+            <svg class="svg-icon" style="fill:var(--ios-red)" viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            </svg>
+          </button>
+          
+          <button id="save-cloud" class="ios-input" style="background:var(--spotify-green); color:white; font-weight:800; display:none; border:none; width: 100%; cursor: pointer;" onclick="uploadWithChunks()">
+            MR MUSIC ga saqlash
+          </button>
+          
+          <button onclick="document.getElementById('file-in').click()" style="color:var(--spotify-green); background:none; border:none; font-weight:600; font-size: 15px; cursor: pointer; margin-top: 10px;">
+            Yoki fayl yuklash
+          </button>
+          <input type="file" id="file-in" hidden accept="audio/*" onchange="onFileSelect(this)">
+          
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="nav-bar">
+    <button class="nav-item active" onclick="switchPage(this, 'page-explore')">
+      <svg viewBox="0 0 24 24">
+        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+      </svg>
+      <span>Musiqalar</span>
+    </button>
+    <button class="nav-item" onclick="switchPage(this, 'page-studio')">
+      <svg viewBox="0 0 24 24">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+      </svg>
+      <span>Musiqa qo'shish</span>
+    </button>
+  </nav>
 <script type="module">
-    // ========== MUSIQA PLAYER MODULE ==========
-    // Bu kod musiqa tugaganda, agar takrorlash rejimi yoqilmagan bo'lsa,
-    // avtomatik ravishda random keyingi musiqaga o'tadi
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, limit, startAfter, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDAoPSkghk-1Kff_f5ystj0qQYF2xSgSRk",
+      authDomain: "bingo-9c6ee.firebaseapp.com",
+      databaseURL: "https://bingo-9c6ee-default-rtdb.firebaseio.com",
+      projectId: "bingo-9c6ee",
+      storageBucket: "bingo-9c6ee.firebasestorage.app",
+      messagingSenderId: "863175962665",
+      appId: "1:863175962665:web:e3c9a8b628375ffc0c6c38",
+      measurementId: "G-1N8P9GVMFP"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- GLOBAL STATE ---
+    let mediaRecorder, chunks = [], activeBlob, timerInterval;
+    let audioCtx = null;
+    let currentAudio = null;      
+    let currentPlayingId = null;   
+    let lastLoadToken = null;
+    let isDragging = false; 
+    let lastVisibleDoc = null;
+    let isFetchingList = false;
+    let hasMoreDocs = true;
+    let studioStream, studioAnz, studioData;
     
-    class MusicPlayer {
-        constructor() {
-            this.playlist = [];
-            this.currentTrackIndex = 0;
-            this.isPlaying = false;
-            this.isRepeat = false;      // Takrorlash rejimi (default: false)
-            this.isShuffle = false;      // Random rejimi
-            this.audio = new Audio();
-            this.currentTime = 0;
-            this._lastTrackIndex = -1;
-            
-            this.initEventListeners();
-        }
+    // RANDOM NEXT TRACK UCHUN YANGI O'ZGARUVCHILAR
+    let randomNextEnabled = true;
+    let allAudioIds = [];
+    let currentAudioIndex = -1;
+
+    const formatTime = (s) => {
+      if (!s || isNaN(s)) return "00:00";
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    };
+
+    // --- ICON INITIALIZATION ---
+    const updateThemeIcon = () => {
+      const icon = document.getElementById('theme-icon');
+      if(document.body.classList.contains('dark-theme')) {
+        icon.innerHTML = '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 000-1.41.996.996 0 00-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 000-1.41.996.996 0 00-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>';
+      } else {
+        icon.innerHTML = '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
+      }
+    };
+    updateThemeIcon();
+
+    window.switchPage = (btn, pageId) => {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      btn.classList.add('active');
+    };
+
+    window.toggleTheme = () => {
+      const body = document.body;
+      body.classList.toggle('dark-theme');
+      
+      if(body.classList.contains('dark-theme')) {
+        localStorage.setItem('theme', 'dark');
+      } else {
+        localStorage.setItem('theme', 'light');
+      }
+      updateThemeIcon();
+    };
+
+    // RANDOM KEYINGI TREKKA O'TISH FUNKSIYASI
+    function playRandomNext() {
+      if (!randomNextEnabled || allAudioIds.length === 0) return;
+      if (currentAudio && currentAudio.loop) return;
+      
+      const currentId = currentPlayingId;
+      let currentIdx = allAudioIds.indexOf(currentId);
+      
+      let nextIndex = currentIdx;
+      while (nextIndex === currentIdx && allAudioIds.length > 1) {
+        nextIndex = Math.floor(Math.random() * allAudioIds.length);
+      }
+      
+      const nextId = allAudioIds[nextIndex];
+      const nextCard = document.getElementById(`card-${nextId}`);
+      const nextPlayBtn = nextCard?.querySelector(`#play-btn-${nextId}`);
+      
+      if (nextPlayBtn && nextId) {
+        nextCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         
-        initEventListeners() {
-            // Musiqa tugaganda
-            this.audio.addEventListener('ended', () => {
-                console.log('[Player] Musiqa tugadi');
-                
-                if (!this.isRepeat) {
-                    // Takrorlash rejimi YO'Q => random keyingi musiqa
-                    this.playNextRandom();
-                } else {
-                    // Takrorlash rejimi YOQILGAN => xuddi shu musiqani takrorla
-                    this.playCurrentTrack();
-                }
-            });
-            
-            // Xatolik bo'lsa ham random keyingi musiqaga o'tish
-            this.audio.addEventListener('error', (e) => {
-                console.error('[Player] Musiqa xatosi:', e);
-                this.playNextRandom();
-            });
-            
-            // Vaqt yangilanganda
-            this.audio.addEventListener('timeupdate', () => {
-                if (this.onTimeUpdate) {
-                    this.onTimeUpdate(this.audio.currentTime, this.audio.duration);
-                }
-            });
-        }
-        
-        // Playlistni o'rnatish
-        setPlaylist(songs) {
-            if (!Array.isArray(songs)) return;
-            this.playlist = songs;
-            console.log(`[Player] Playlist yangilandi: ${this.playlist.length} ta musiqa`);
-            if (this.onPlaylistUpdate) {
-                this.onPlaylistUpdate(this.playlist);
-            }
-        }
-        
-        // Musiqa qo'shish
-        addTrack(track) {
-            if (!track || !track.url) return;
-            this.playlist.push(track);
-            console.log(`[Player] Yangi musiqa qo'shildi: ${track.title}`);
-            if (this.onPlaylistUpdate) {
-                this.onPlaylistUpdate(this.playlist);
-            }
-        }
-        
-        // Random keyingi musiqaga o'tish (asosiy funksiya)
-        playNextRandom() {
-            if (this.playlist.length === 0) {
-                console.warn('[Player] Playlist bo\'sh');
-                return;
-            }
-            
-            let nextIndex;
-            
-            if (this.isShuffle) {
-                // Random rejimi yoqilgan: butunlay random
-                do {
-                    nextIndex = Math.floor(Math.random() * this.playlist.length);
-                } while (nextIndex === this.currentTrackIndex && this.playlist.length > 1);
-            } else {
-                // Random rejimi yo'q: hozirgi musiqadan boshqa random
-                if (this.playlist.length === 1) {
-                    nextIndex = 0;
-                } else {
-                    nextIndex = Math.floor(Math.random() * (this.playlist.length - 1));
-                    if (nextIndex >= this.currentTrackIndex) nextIndex++;
-                }
-            }
-            
-            this.currentTrackIndex = nextIndex;
-            this.playCurrentTrack();
-            
-            const track = this.playlist[this.currentTrackIndex];
-            console.log(`[Player] Random keyingi musiqa: ${track?.title || 'Noma\'lum'}`);
-        }
-        
-        // Keyingi musiqaga o'tish
-        playNext() {
-            if (this.playlist.length === 0) return;
-            
-            if (this.isShuffle) {
-                let nextIndex;
-                do {
-                    nextIndex = Math.floor(Math.random() * this.playlist.length);
-                } while (nextIndex === this.currentTrackIndex && this.playlist.length > 1);
-                this.currentTrackIndex = nextIndex;
-            } else {
-                this.currentTrackIndex = (this.currentTrackIndex + 1) % this.playlist.length;
-            }
-            
-            this.playCurrentTrack();
-        }
-        
-        // Oldingi musiqaga o'tish
-        playPrevious() {
-            if (this.playlist.length === 0) return;
-            
-            if (this.isShuffle) {
-                let prevIndex;
-                do {
-                    prevIndex = Math.floor(Math.random() * this.playlist.length);
-                } while (prevIndex === this.currentTrackIndex && this.playlist.length > 1);
-                this.currentTrackIndex = prevIndex;
-            } else {
-                this.currentTrackIndex = (this.currentTrackIndex - 1 + this.playlist.length) % this.playlist.length;
-            }
-            
-            this.playCurrentTrack();
-        }
-        
-        // Hozirgi musiqani o'ynatish
-        playCurrentTrack() {
-            if (this.playlist.length === 0) {
-                console.warn('[Player] Playlist bo\'sh');
-                return;
-            }
-            
-            const track = this.playlist[this.currentTrackIndex];
-            if (!track || !track.url) {
-                console.error('[Player] Musiqa URL topilmadi');
-                this.playNextRandom();
-                return;
-            }
-            
-            this._lastTrackIndex = this.currentTrackIndex;
-            this.audio.src = track.url;
-            this.audio.load();
-            
-            if (this.currentTime > 0 && this.currentTrackIndex === this._lastTrackIndex) {
-                this.audio.currentTime = this.currentTime;
-            } else {
-                this.currentTime = 0;
-            }
-            
-            this.audio.play().catch(e => {
-                console.error('[Player] Musiqa o\'ynatilmadi:', e);
-            });
-            
-            this.isPlaying = true;
-            
-            if (this.onTrackChange) {
-                this.onTrackChange(track, this.currentTrackIndex);
-            }
-            if (this.onPlayStateChange) {
-                this.onPlayStateChange(true);
-            }
-            
-            console.log(`[Player] ▶️ O'ynatilmoqda: ${track.title} - ${track.artist || 'Noma\'lum'}`);
-        }
-        
-        // To'xtatish
-        pause() {
-            this.audio.pause();
-            this.isPlaying = false;
-            if (this.onPlayStateChange) {
-                this.onPlayStateChange(false);
-            }
-        }
-        
-        // Davom ettirish
-        play() {
-            this.audio.play();
-            this.isPlaying = true;
-            if (this.onPlayStateChange) {
-                this.onPlayStateChange(true);
-            }
-        }
-        
-        // Play/Pause
-        togglePlay() {
-            if (this.isPlaying) {
-                this.pause();
-            } else {
-                this.play();
-            }
-        }
-        
-        // Ovoz balandligi (0-1)
-        setVolume(volume) {
-            const vol = Math.max(0, Math.min(1, volume));
-            this.audio.volume = vol;
-            if (this.onVolumeChange) {
-                this.onVolumeChange(vol);
-            }
-        }
-        
-        // Vaqtni o'zgartirish
-        seekTo(time) {
-            if (time >= 0 && time <= this.audio.duration) {
-                this.audio.currentTime = time;
-                this.currentTime = time;
-            }
-        }
-        
-        // Takrorlash rejimini o'zgartirish
-        toggleRepeat() {
-            this.isRepeat = !this.isRepeat;
-            console.log(`[Player] Takrorlash rejimi: ${this.isRepeat ? 'YOQILDI' : 'O\'CHIRILDI'}`);
-            if (this.onRepeatChange) {
-                this.onRepeatChange(this.isRepeat);
-            }
-            return this.isRepeat;
-        }
-        
-        // Random rejimini o'zgartirish
-        toggleShuffle() {
-            this.isShuffle = !this.isShuffle;
-            console.log(`[Player] Random rejimi: ${this.isShuffle ? 'YOQILDI' : 'O\'CHIRILDI'}`);
-            if (this.onShuffleChange) {
-                this.onShuffleChange(this.isShuffle);
-            }
-            return this.isShuffle;
-        }
-        
-        // Hozirgi musiqani olish
-        getCurrentTrack() {
-            return this.playlist[this.currentTrackIndex] || null;
-        }
-        
-        // Playlistni tozalash
-        clearPlaylist() {
-            this.playlist = [];
-            this.currentTrackIndex = 0;
-            this.audio.pause();
-            this.audio.src = '';
-            this.isPlaying = false;
-            console.log('[Player] Playlist tozalandi');
-            if (this.onPlaylistUpdate) {
-                this.onPlaylistUpdate(this.playlist);
-            }
-        }
-        
-        // Callback funksiyalar
-        onTrackChange(callback) { this.onTrackChange = callback; }
-        onTimeUpdate(callback) { this.onTimeUpdate = callback; }
-        onPlayStateChange(callback) { this.onPlayStateChange = callback; }
-        onVolumeChange(callback) { this.onVolumeChange = callback; }
-        onRepeatChange(callback) { this.onRepeatChange = callback; }
-        onShuffleChange(callback) { this.onShuffleChange = callback; }
-        onPlaylistUpdate(callback) { this.onPlaylistUpdate = callback; }
+        setTimeout(() => {
+          const nextData = getAudioData(nextId);
+          if (nextData) {
+            window.playAudio(nextId, nextPlayBtn, nextData);
+          }
+        }, 500);
+      }
     }
     
-    // ========== PLAYER OBYEKTINI YARATISH ==========
-    const player = new MusicPlayer();
-    
-    // ========== MISOL: PLAYLIST (O'Z MUSIQALARINGIZ BILAN ALMASHTIRING) ==========
-    const examplePlaylist = [
-        { id: 1, title: "Musiqa 1", artist: "Artist 1", url: "https://example.com/music1.mp3", duration: 180 },
-        { id: 2, title: "Musiqa 2", artist: "Artist 2", url: "https://example.com/music2.mp3", duration: 210 },
-        { id: 3, title: "Musiqa 3", artist: "Artist 3", url: "https://example.com/music3.mp3", duration: 195 },
-        { id: 4, title: "Musiqa 4", artist: "Artist 4", url: "https://example.com/music4.mp3", duration: 225 },
-    ];
-    
-    // Playlistni o'rnatish
-    player.setPlaylist(examplePlaylist);
-    
-    // ========== UI CALLBACKLAR (O'Z UI ELEMENTLARINGIZGA MOSLANG) ==========
-    player.onTrackChange((track, index) => {
-        console.log(`🎵 Endi: ${track.title} (${index + 1}/${player.playlist.length})`);
-        // UI yangilash:
-        // const titleEl = document.getElementById('current-song-title');
-        // if (titleEl) titleEl.textContent = track.title;
-        // const artistEl = document.getElementById('current-song-artist');
-        // if (artistEl) artistEl.textContent = track.artist || '';
-    });
-    
-    player.onTimeUpdate((currentTime, duration) => {
-        const progressPercent = duration ? (currentTime / duration) * 100 : 0;
-        // Progress barni yangilash:
-        // const progressBar = document.getElementById('progress-bar-fill');
-        // if (progressBar) progressBar.style.width = `${progressPercent}%`;
-        // const currentTimeEl = document.getElementById('current-time');
-        // if (currentTimeEl) currentTimeEl.textContent = formatTime(currentTime);
-        // const durationEl = document.getElementById('duration');
-        // if (durationEl) durationEl.textContent = formatTime(duration);
-    });
-    
-    player.onPlayStateChange((isPlaying) => {
-        console.log(`Player state: ${isPlaying ? '▶️ O\'ynatilmoqda' : '⏸ To\'xtatilgan'}`);
-        // Play/Pause tugmasini yangilash:
-        // const playBtn = document.getElementById('play-pause-btn');
-        // if (playBtn) playBtn.innerHTML = isPlaying ? '⏸' : '▶';
-    });
-    
-    player.onRepeatChange((isRepeat) => {
-        console.log(`Repeat mode: ${isRepeat ? 'ON' : 'OFF'}`);
-        // Repeat tugmasini yangilash:
-        // const repeatBtn = document.getElementById('repeat-btn');
-        // if (repeatBtn) repeatBtn.classList.toggle('active', isRepeat);
-    });
-    
-    player.onShuffleChange((isShuffle) => {
-        console.log(`Shuffle mode: ${isShuffle ? 'ON' : 'OFF'}`);
-        // Shuffle tugmasini yangilash:
-        // const shuffleBtn = document.getElementById('shuffle-btn');
-        // if (shuffleBtn) shuffleBtn.classList.toggle('active', isShuffle);
-    });
-    
-    // Vaqtni formatlash uchun yordamchi funksiya
-    function formatTime(seconds) {
-        if (isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    // AUDIO DATALARNI OLISH FUNKSIYASI
+    function getAudioData(id) {
+      const card = document.getElementById(`card-${id}`);
+      if (!card) return null;
+      
+      const nameEl = card.querySelector('.card-meta h4');
+      const name = nameEl ? nameEl.innerText : '';
+      const sizeEl = card.querySelector('.card-meta p');
+      const size = sizeEl ? sizeEl.innerText : '';
+      
+      return { name, size };
     }
     
-    // ========== PLAYERNI GLOBAL QILISH (ixtiyoriy) ==========
-    window.musicPlayer = player;
-    window.formatTime = formatTime;
-    
-    // ========== TUGMALAR UCHUN EVENT LISTENERLAR (O'Z TUGMALARINGIZGA MOSLANG) ==========
-    // Agar sahifangizda tugmalar mavjud bo'lsa, ularni shu yerda bog'lang:
-    /*
-    document.getElementById('play-pause-btn')?.addEventListener('click', () => player.togglePlay());
-    document.getElementById('next-btn')?.addEventListener('click', () => player.playNext());
-    document.getElementById('prev-btn')?.addEventListener('click', () => player.playPrevious());
-    document.getElementById('repeat-btn')?.addEventListener('click', () => player.toggleRepeat());
-    document.getElementById('shuffle-btn')?.addEventListener('click', () => player.toggleShuffle());
-    document.getElementById('volume-slider')?.addEventListener('input', (e) => player.setVolume(e.target.value / 100));
-    document.getElementById('progress-bar')?.addEventListener('click', (e) => {
-        const progressBar = e.currentTarget;
-        const rect = progressBar.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const percent = clickX / rect.width;
-        const duration = player.audio.duration;
-        if (duration) player.seekTo(percent * duration);
-    });
-    */
-    
-    // Musiqani random boshlash (agar playlist bo'sh bo'lmasa)
-    if (player.playlist.length > 0) {
-        // Random boshlash uchun:
-        const randomIndex = Math.floor(Math.random() * player.playlist.length);
-        player.currentTrackIndex = randomIndex;
-        // player.playCurrentTrack();  // Agar avtomatik o'ynasin desangiz
+    // BARCHA AUDIO IDLARNI YUKLASH
+    async function loadAllAudioIds() {
+      try {
+        const q = query(collection(db, "audios"), orderBy("at", "desc"));
+        const snap = await getDocs(q);
+        allAudioIds = snap.docs.map(doc => doc.id);
+      } catch (e) {
+        console.error("Error loading all IDs:", e);
+      }
     }
     
-    console.log('🎵 Music Player module loaded successfully!');
-    console.log('💡 Asosiy xususiyat: Musiqa tugaganda random keyingi musiqaga o\'tish (agar takrorlash rejimi yoqilmagan bo\'lsa)');
-</script>
+    loadAllAudioIds();
+
+    async function loadAudioList(isNext = false) {
+      if (isFetchingList || !hasMoreDocs) return;
+      isFetchingList = true;
+      const indicator = document.getElementById('load-more-indicator');
+      if (indicator) indicator.style.display = 'block';
+
+      try {
+        let q = query(collection(db, "audios"), orderBy("at", "desc"), limit(10));
+        if (isNext && lastVisibleDoc) {
+          q = query(collection(db, "audios"), orderBy("at", "desc"), startAfter(lastVisibleDoc), limit(5));
+        }
+
+        const snap = await getDocs(q);
+        if (snap.empty) {
+          hasMoreDocs = false;
+        } else {
+          lastVisibleDoc = snap.docs[snap.docs.length - 1];
+          const list = document.getElementById('audio-list');
+          snap.forEach(d => {
+            if (!document.getElementById(`card-${d.id}`)) {
+              list.appendChild(renderCard(d.id, d.data()));
+              if (!allAudioIds.includes(d.id)) {
+                allAudioIds.push(d.id);
+              }
+            }
+          });
+          handleDeepLink();
+        }
+      } catch (e) { console.error("Firebase error:", e); }
+      if (indicator) indicator.style.display = 'none';
+      isFetchingList = false;
+    }
+
+    loadAudioList();
+
+    window.addEventListener('scroll', () => {
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 300) {
+        loadAudioList(true);
+      }
+    });
+
+    function renderCard(id, data) {
+      const div = document.createElement('div');
+      div.className = "audio-card";
+      div.id = `card-${id}`;
+      div.innerHTML = `
+        <div class="card-meta">
+          <h4>${data.name || 'MRAI Audio'}</h4>
+          <p>${data.at?.toDate ? new Date(data.at.toDate()).toLocaleTimeString() : ''} • ${data.size}</p>
+        </div>
+        <div class="waveform-visualizer" id="wf-${id}">
+          ${Array(50).fill('<div class="w-bar"></div>').join('')}
+        </div>
+        <div id="time-${id}" class="time-display" style="font-size: 11px; color: var(--text-sec); text-align: right; margin-bottom: 5px; font-family: monospace;">00:00 / 00:00</div>
+        <div class="progress-box" id="pbox-${id}">
+          <div class="progress-fill" id="pf-${id}"></div>
+        </div>
+        <div class="controls">
+          <button class="btn-svg" id="loop-btn-${id}"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>
+          <button class="btn-svg" id="prev-btn-${id}"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+          <button class="btn-svg btn-play" id="play-btn-${id}">
+            <svg class="svg-icon" id="ic-${id}" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="btn-svg" id="next-btn-${id}"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg></button>
+          <button class="btn-svg" id="share-btn-${id}"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg></button>
+        </div>
+      `;
+
+      div.querySelector(`#play-btn-${id}`).onclick = (e) => window.playAudio(id, e.currentTarget, data);
+      div.querySelector(`#pbox-${id}`).onmousedown = (e) => window.playAudio.seek(e, id);
+      div.querySelector(`#pbox-${id}`).ontouchstart = (e) => window.playAudio.seek(e, id);
+      div.querySelector(`#loop-btn-${id}`).onclick = (e) => window.playAudio.toggleLoop(id, e.currentTarget);
+      div.querySelector(`#prev-btn-${id}`).onclick = () => window.playAudio.skip(id, -10);
+      div.querySelector(`#next-btn-${id}`).onclick = () => window.playAudio.skip(id, 10);
+      div.querySelector(`#share-btn-${id}`).onclick = () => {
+        const shareUrl = `${window.location.origin}${window.location.pathname}#card-${id}`;
+        if (navigator.share) {
+          navigator.share({ title: data.name, text: "MR Audio-da tinglang:", url: shareUrl });
+        } else {
+          navigator.clipboard.writeText(shareUrl);
+          alert("Havola nusxalandi!");
+        }
+      };
+      return div;
+    }
+
+    const handleDeepLink = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#card-')) {
+        const target = document.querySelector(hash);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.style.transition = "box-shadow 0.5s";
+          target.style.boxShadow = "0 0 20px rgba(29, 185, 84, 0.4)";
+          setTimeout(() => target.style.boxShadow = "none", 3000);
+        }
+      }
+    };
+
+    window.playAudio = async (id, btn, cardData) => {
+      const icon = document.getElementById(`ic-${id}`);
+      const bars = document.querySelectorAll(`#wf-${id} .w-bar`);
+      const fill = document.getElementById(`pf-${id}`);
+      const timeEl = document.getElementById(`time-${id}`);
+
+      if (currentPlayingId === id && currentAudio) {
+        if (currentAudio.paused) {
+          if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+          currentAudio.play();
+          icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+          startViz(currentAudio, currentAudio.anz, currentAudio.dat, id, bars, fill);
+        } else {
+          currentAudio.pause();
+          icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        }
+        return;
+      }
+
+      if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio.load(); }
+
+      if (currentPlayingId) {
+        const oldIcon = document.getElementById(`ic-${currentPlayingId}`);
+        if (oldIcon) oldIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        const oldSpin = document.getElementById(`spin-${currentPlayingId}`);
+        if (oldSpin) oldSpin.remove();
+        const oldFill = document.getElementById(`pf-${currentPlayingId}`);
+        if (oldFill) oldFill.style.width = "0%";
+        document.querySelectorAll(`#wf-${currentPlayingId} .w-bar`).forEach(b => { 
+          b.classList.remove('active'); b.style.height = "5px"; 
+        });
+      }
+
+      const myToken = Date.now();
+      lastLoadToken = myToken;
+      currentPlayingId = id;
+
+      const spinner = document.createElement('div');
+      spinner.className = 'loading-spinner';
+      spinner.id = `spin-${id}`;
+      btn.appendChild(spinner);
+      icon.style.display = 'none';
+
+      try {
+        const snap = await getDocs(query(collection(db, `audios/${id}/chunks`), orderBy("idx")));
+        if (lastLoadToken !== myToken) return;
+
+        let b64 = ""; snap.forEach(c => b64 += c.data().data);
+        const audio = new Audio(b64);
+        currentAudio = audio;
+
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        const source = audioCtx.createMediaElementSource(audio);
+        const analyzer = audioCtx.createAnalyser();
+        source.connect(analyzer); analyzer.connect(audioCtx.destination);
+        analyzer.fftSize = 128;
+        const data = new Uint8Array(analyzer.frequencyBinCount);
+
+        audio.anz = analyzer; audio.dat = data;
+        
+        audio.onloadedmetadata = () => {
+          if (timeEl) timeEl.innerText = `00:00 / ${formatTime(audio.duration)}`;
+        };
+
+        if (spinner) spinner.remove();
+        icon.style.display = 'block';
+        icon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        audio.play(); 
+        startViz(audio, analyzer, data, id, bars, fill);
+        
+        audio.onended = () => { 
+          if (currentPlayingId === id) { 
+            icon.innerHTML = '<path d="M8 5v14l11-7z"/>'; 
+            fill.style.width = "0%"; 
+            bars.forEach(b => { b.classList.remove('active'); b.style.height = "5px"; }); 
+            
+            // Loop YOQ bo'lsa random keyingi trekka o'tish
+            if (!audio.loop) {
+              playRandomNext();
+            }
+          } 
+        };
+      } catch(err) { console.error(err); if (spinner) spinner.remove(); icon.style.display = 'block'; }
+    };
+
+    function startViz(audio, analyzer, dataArray, id, bars, fill) {
+      const timeEl = document.getElementById(`time-${id}`);
+      let lastSec = -1;
+
+      function draw() {
+        if (!audio.paused && currentPlayingId === id) {
+          requestAnimationFrame(draw);
+          analyzer.getByteFrequencyData(dataArray);
+          
+          const currentSec = Math.floor(audio.currentTime);
+          if (timeEl && currentSec !== lastSec) {
+            lastSec = currentSec;
+            timeEl.innerText = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+            timeEl.classList.remove('time-update');
+            void timeEl.offsetWidth; 
+            timeEl.classList.add('time-update');
+          }
+
+          const center = Math.floor(bars.length / 2);
+          bars.forEach((b, i) => {
+            const dist = Math.abs(i - center);
+            let h = (dataArray[dist % dataArray.length] / 3) + 5;
+            b.style.height = Math.max(5, h * (1 - (dist / center) * 0.7)) + "px";
+            b.classList.add('active');
+          });
+          if (!isDragging) fill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
+        }
+      }
+      draw();
+    }
+
+    window.playAudio.seek = (e, id) => {
+      if (currentPlayingId !== id || !currentAudio || !currentAudio.duration) return;
+      const box = document.getElementById(`pbox-${id}`);
+      const fill = document.getElementById(`pf-${id}`);
+      
+      const update = (clientX) => {
+        const rect = box.getBoundingClientRect();
+        let p = (clientX - rect.left) / rect.width;
+        p = Math.max(0, Math.min(1, p));
+        fill.style.width = (p * 100) + "%";
+        currentAudio.currentTime = p * currentAudio.duration;
+      };
+
+      const onMove = (me) => { isDragging = true; update(me.touches ? me.touches[0].clientX : me.clientX); };
+      const onStop = () => { isDragging = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('touchmove', onMove); };
+      
+      update(e.touches ? e.touches[0].clientX : e.clientX);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('touchmove', onMove, { passive: false });
+      window.addEventListener('mouseup', onStop, { once: true });
+      window.addEventListener('touchend', onStop, { once: true });
+    };
+
+    window.playAudio.skip = (id, sec) => { if (currentPlayingId === id && currentAudio) currentAudio.currentTime += sec; };
+    
+    window.playAudio.toggleLoop = (id, btn) => { 
+      if (currentPlayingId === id && currentAudio) { 
+        currentAudio.loop = !currentAudio.loop; 
+        btn.classList.toggle('loop-active', currentAudio.loop);
+      } 
+    };
+
+    window.handleRecord = async () => {
+      const btn = document.getElementById('rec-trigger');
+      const sViz = document.getElementById('studio-viz');
+      
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        try {
+          studioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(studioStream);
+          const sCtx = new (AudioContext || window.webkitAudioContext)();
+          const sSrc = sCtx.createMediaStreamSource(studioStream);
+          studioAnz = sCtx.createAnalyser();
+          sSrc.connect(studioAnz);
+          studioAnz.fftSize = 64;
+          studioData = new Uint8Array(studioAnz.frequencyBinCount);
+          
+          sViz.innerHTML = Array(30).fill('<div class="s-bar"></div>').join('');
+          const sBars = sViz.querySelectorAll('.s-bar');
+          
+          function drawStudio() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+              requestAnimationFrame(drawStudio);
+              studioAnz.getByteFrequencyData(studioData);
+              sBars.forEach((b, i) => {
+                let h = (studioData[i % studioData.length] / 2.5) + 4;
+                b.style.height = h + "px";
+                b.style.background = "var(--ios-red)";
+              });
+            }
+          }
+
+          chunks = [];
+          mediaRecorder.ondataavailable = e => chunks.push(e.data);
+          mediaRecorder.onstop = () => { 
+              activeBlob = new Blob(chunks, { type: 'audio/webm' }); 
+              document.getElementById('save-cloud').style.display = 'block';
+              studioStream.getTracks().forEach(t => t.stop());
+          };
+          
+          mediaRecorder.start(); startTimer(); drawStudio();
+          btn.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" style="fill:var(--ios-red)"/></svg>';
+        } catch (e) { alert("Mikrofon ruxsati kerak!"); }
+      } else {
+        mediaRecorder.stop(); clearInterval(timerInterval);
+        btn.innerHTML = '<svg class="svg-icon" style="fill:var(--ios-red)" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg>';
+      }
+    };
+
+    window.uploadWithChunks = async () => {
+      const name = document.getElementById('rec-name').value || "MRAI Recording";
+      const upTxt = document.getElementById('up-txt');
+      const upBar = document.getElementById('up-bar');
+      const reader = new FileReader();
+      
+      upTxt.style.display = 'block';
+      reader.readAsDataURL(activeBlob);
+      reader.onloadend = async () => {
+        const base64 = reader.result;
+        const LIMIT = 900 * 1024;
+        const total = Math.ceil(base64.length / LIMIT);
+        const bytes = activeBlob.size;
+        let sizeStr = bytes >= 1000000 ? (bytes / 1000000).toFixed(1) + " MB" : (bytes / 1000).toFixed(1) + " KB";
+
+        const docRef = await addDoc(collection(db, "audios"), { name, at: new Date(), size: sizeStr });
+        for(let i=0; i<total; i++) {
+          await addDoc(collection(db, `audios/${docRef.id}/chunks`), { idx: i, data: base64.substring(i*LIMIT, (i+1)*LIMIT) });
+          upBar.style.width = Math.round(((i+1)/total)*100) + "%";
+          document.getElementById('up-p').innerText = Math.round(((i+1)/total)*100);
+        }
+        location.reload();
+      };
+    };
+
+    window.onFileSelect = (el) => { 
+      if (el.files[0]) { 
+          activeBlob = el.files[0]; 
+          document.getElementById('rec-name').value = el.files[0].name.split('.')[0];
+          document.getElementById('save-cloud').style.display = 'block'; 
+      } 
+    };
+
+    function startTimer() { 
+      let s=0; const tEl = document.getElementById('timer');
+      tEl.innerText = "00:00";
+      timerInterval=setInterval(()=>{ 
+          s++; let m=Math.floor(s/60); 
+          tEl.innerText=`${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; 
+      },1000); 
+    }
+  </script>
 
 </body>
 </html>
