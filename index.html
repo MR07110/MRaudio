@@ -1,676 +1,359 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>MR BOARD · Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>MR MUSIC</title>
+  
+  <style>
+    /* --- MUKAMMAL DINAMIK O'ZGARUVCHILAR --- */
+    :root {
+      --spotify-green: #1DB954; 
+      --ios-red: #ff3b30; 
+      
+      /* Kunduzgi rejim (Light) */
+      --bg: #ffffff;
+      --text-main: #000000; 
+      --text-sec: #8e8e93; 
+      --wave-color: #47c1b1;
+      --bg-soft: #f2f2f7;
+      --border-color: #e5e5ea;
+      --nav-bg: rgba(255, 255, 255, 0.85);
+      --toast-bg: rgba(255, 255, 255, 0.95);
+      --toast-text: #000000;
+      --progress-bg: #eeeeee;
+      --icon-fill: #000000;
+      --theme-btn-border: #e5e5ea;
+    }
 
-        :root {
-            --bg-base: #ffffff;
-            --bg-alt: #f8fafc;
-            --bg-glass: rgba(255,255,255,0.65);
-            --bg-panel: rgba(255,255,255,0.85);
-            --bg-card: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --border-subtle: #e2e8f0;
-            --border-strong: rgba(0,0,0,0.05);
-            --brand-primary: #007aff;
-            --brand-primary-dark: #0056b3;
-            --brand-alpha: rgba(0,122,255,0.1);
-            --state-danger: #ff3b30;
-            --state-success: #34c759;
-            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-            --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
-            --shadow-lg: 0 24px 48px -12px rgba(0,0,0,0.15);
-            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-            --transition-fast: 0.2s;
-            --transition-normal: 0.3s;
-        }
+    body.dark-theme {
+      /* Tungi rejim (Dark) */
+      --bg: #000000;
+      --text-main: #ffffff;
+      --text-sec: #a1a1a6;
+      --wave-color: #3aa89a;
+      --bg-soft: #1c1c1e;
+      --border-color: #2c2c2e;
+      --nav-bg: rgba(0, 0, 0, 0.85);
+      --toast-bg: rgba(30, 30, 30, 0.95);
+      --toast-text: #ffffff;
+      --progress-bg: #333333;
+      --icon-fill: #ffffff;
+      --theme-btn-border: #333333;
+    }
 
-        [data-theme="dark"] {
-            --bg-base: #020617;
-            --bg-alt: #0f172a;
-            --bg-glass: rgba(15,23,42,0.65);
-            --bg-panel: rgba(15,23,42,0.85);
-            --bg-card: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-subtle: rgba(255,255,255,0.1);
-            --border-strong: rgba(255,255,255,0.05);
-            --brand-primary: #0a84ff;
-            --brand-primary-dark: #007aff;
-            --brand-alpha: rgba(10,132,255,0.15);
-        }
+    * { 
+      box-sizing: border-box; 
+      -webkit-tap-highlight-color: transparent; 
+      outline: none; 
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-            background: var(--bg-alt);
-            color: var(--text-main);
-            height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
+    body { 
+      font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      background: var(--bg); 
+      margin: 0; 
+      padding-bottom: 150px; 
+      color: var(--text-main); 
+      overflow-x: hidden;
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
 
-        /* Header */
-        .header {
-            padding: 16px 20px;
-            background: var(--bg-glass);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+    .container { 
+      max-width: 500px; 
+      margin: 0 auto; 
+      padding: 20px; 
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 24px;
-            font-weight: 800;
-            text-decoration: none;
-            color: var(--text-main);
-        }
-        .logo span { color: var(--brand-primary); }
+    .header-title { 
+      font-size: 34px; 
+      font-weight: 800; 
+      margin-bottom: 25px; 
+      letter-spacing: -1px; 
+    }
 
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    [id^="time-"] {
+      font-size: 12px;
+      color: var(--text-sec);
+      text-align: right;
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums; 
+      font-weight: 500;
+      transition: transform 0.2s ease, color 0.4s ease;
+      display: block;
+    }
 
-        .search-container { position: relative; }
-        .search-input {
-            background: var(--bg-panel);
-            border: 1px solid var(--border-subtle);
-            border-radius: 40px;
-            padding: 8px 16px 8px 40px;
-            font-size: 14px;
-            width: 220px;
-            color: var(--text-main);
-        }
-        .search-input:focus {
-            outline: none;
-            border-color: var(--brand-primary);
-            width: 280px;
-        }
-        .search-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
+    .time-update {
+      animation: timePop 0.3s ease-out;
+    }
 
-        .theme-toggle {
-            background: var(--bg-panel);
-            border: 1px solid var(--border-subtle);
-            border-radius: 40px;
-            padding: 8px 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .theme-toggle:hover { background: var(--brand-alpha); }
+    @keyframes timePop {
+      0% { opacity: 0.7; transform: translateY(2px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
 
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            cursor: pointer;
-        }
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--brand-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 16px;
-            overflow: hidden;
-            background-size: cover;
-            background-position: center;
-        }
-        .user-name { font-weight: 600; font-size: 14px; }
+    #up-bar { 
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      height: 4px; 
+      background: var(--spotify-green); 
+      width: 0%; 
+      z-index: 3000; 
+      transition: width 0.3s ease; 
+    }
 
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            padding-bottom: 80px;
-        }
+    #up-txt { 
+      position: fixed; 
+      top: 10px; 
+      right: 15px; 
+      background: var(--toast-bg); 
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--toast-text); 
+      font-size: 12px; 
+      font-weight: 600;
+      padding: 8px 16px; 
+      border-radius: 20px; 
+      border: 1px solid var(--border-color);
+      display: none; 
+      z-index: 3000; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+    }
 
-        .welcome-card {
-            background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-            border-radius: 28px;
-            padding: 24px;
-            color: white;
-            margin-bottom: 24px;
-        }
-        .welcome-card h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
-        .welcome-card p { font-size: 14px; opacity: 0.9; }
+    .audio-card { 
+      margin-bottom: 40px; 
+      border-bottom: 1px solid var(--border-color); 
+      padding-bottom: 20px; 
+      transition: border-color 0.4s ease, background-color 0.4s ease, padding 0.4s ease, border-radius 0.4s ease, box-shadow 0.4s ease;
+    }
 
-        .quick-actions {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
-            overflow-x: auto;
-        }
-        .quick-action {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            border-radius: 40px;
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            color: var(--text-main);
-        }
-        .quick-action:hover { transform: translateY(-2px); border-color: var(--brand-primary); }
-        .quick-action.create { background: var(--brand-primary); color: white; border: none; }
+    .audio-card:target {
+      background: var(--bg-soft);
+      padding: 15px;
+      border-radius: 16px;
+      border-bottom-color: transparent;
+      box-shadow: 0 0 20px rgba(29, 185, 84, 0.15);
+    }
 
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 24px 0 16px;
-        }
-        .section-title { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
-        .refresh-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-        }
-        .refresh-btn:hover { background: var(--brand-alpha); color: var(--brand-primary); transform: rotate(180deg); }
+    .card-meta h4 { 
+      margin: 0; 
+      font-size: 19px; 
+      font-weight: 700;
+    }
 
-        .rooms-container {
-            max-height: calc(100vh - 280px);
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-        .rooms-container::-webkit-scrollbar { width: 4px; }
-        .rooms-container::-webkit-scrollbar-track { background: var(--border-strong); border-radius: 10px; }
-        .rooms-container::-webkit-scrollbar-thumb { background: var(--brand-primary); border-radius: 10px; }
+    .card-meta p { 
+      margin: 4px 0; 
+      color: var(--text-sec); 
+      font-size: 13px; 
+      transition: color 0.4s ease;
+    }
 
-        .rooms-grid { display: flex; flex-direction: column; gap: 16px; }
+    .waveform-visualizer { 
+      width: 100%; 
+      height: 70px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      gap: 2.5px; 
+      margin: 20px 0; 
+    }
 
-        .room-card {
-            background: var(--bg-card);
-            border-radius: 24px;
-            padding: 20px;
-            transition: all var(--transition-normal);
-            border: 1px solid var(--border-subtle);
-        }
-        .room-card:hover { transform: translateY(-2px); border-color: var(--brand-primary); box-shadow: var(--shadow-md); }
+    .w-bar { 
+      flex: 1; 
+      border-radius: 10px; 
+      height: 6px; 
+      background: var(--border-color); 
+      transition: height 0.1s ease, background-color 0.4s ease; 
+    }
 
-        .room-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 12px;
-        }
-        .room-name { font-size: 16px; font-weight: 700; }
-        .room-badge {
-            font-size: 11px;
-            padding: 4px 10px;
-            border-radius: 20px;
-            background: var(--brand-alpha);
-            color: var(--brand-primary);
-        }
-        .room-badge.active { background: rgba(52,199,89,0.15); color: var(--state-success); }
-        .room-badge.private { background: rgba(255,59,48,0.1); color: var(--state-danger); }
+    .w-bar.active { background: var(--wave-color); }
 
-        .creator-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .creator-avatar {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: var(--brand-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            background-size: cover;
-            background-position: center;
-        }
-        .creator-name { font-size: 12px; font-weight: 600; cursor: pointer; }
-        .creator-name:hover { color: var(--brand-primary); }
+    .progress-box { 
+      position: relative; 
+      width: 100%; 
+      height: 6px; 
+      background: var(--progress-bg); 
+      border-radius: 3px; 
+      margin-bottom: 25px; 
+      cursor: pointer; 
+      transition: background-color 0.4s ease;
+    }
 
-        .room-meta {
-            display: flex;
-            gap: 16px;
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
+    .progress-fill { 
+      height: 100%; 
+      background: var(--spotify-green); 
+      width: 0%; 
+      border-radius: 3px; 
+      position: relative; 
+    }
 
-        .room-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 12px;
-        }
-        .room-btn {
-            flex: 1;
-            padding: 10px;
-            border-radius: 16px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-            transition: all var(--transition-fast);
-        }
-        .room-join-btn { background: var(--brand-primary); color: white; border: none; }
-        .room-join-btn:hover { background: var(--brand-primary-dark); transform: translateY(-2px); }
-        .room-edit-btn { background: var(--bg-alt); border: 1px solid var(--border-subtle); color: var(--text-main); }
-        .room-edit-btn:hover { background: var(--brand-alpha); border-color: var(--brand-primary); }
-        .room-delete-btn { background: rgba(255,59,48,0.1); border: 1px solid rgba(255,59,48,0.2); color: var(--state-danger); }
-        .room-delete-btn:hover { background: rgba(255,59,48,0.2); transform: translateY(-2px); }
+    .progress-fill::after { 
+      content: ''; 
+      position: absolute; 
+      right: -7px; 
+      top: -5px; 
+      width: 16px; 
+      height: 16px; 
+      background: #fff; 
+      border: 3px solid var(--spotify-green); 
+      border-radius: 50%; 
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
 
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-muted);
-            background: var(--bg-card);
-            border-radius: 24px;
-            border: 1px solid var(--border-subtle);
-        }
+    .controls { 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 25px; 
+    }
 
-        /* Bottom Tab Bar */
-        .bottom-tab-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-glass);
-            backdrop-filter: blur(40px);
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            padding: 10px 20px 20px;
-            z-index: 100;
-        }
-        .tab-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 40px;
-        }
-        .tab-item i { font-size: 24px; }
-        .tab-item.active { color: var(--brand-primary); background: var(--brand-alpha); }
+    .btn-svg { 
+      background: none; 
+      border: none; 
+      cursor: pointer; 
+      padding: 10px; 
+      display: flex; 
+      align-items: center; 
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+      position: relative;
+    }
 
-        /* Profile Modal */
-        .profile-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(8px);
-            z-index: 300;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all var(--transition-normal);
-        }
-        .profile-modal.active { opacity: 1; visibility: visible; }
-        .profile-modal-content {
-            background: var(--bg-panel);
-            backdrop-filter: blur(40px);
-            border-radius: 32px;
-            padding: 32px;
-            width: 90%;
-            max-width: 380px;
-            text-align: center;
-            transform: scale(0.9);
-            transition: transform var(--transition-normal) var(--ease-spring);
-            border: 1px solid var(--border-subtle);
-        }
-        .profile-modal.active .profile-modal-content { transform: scale(1); }
-        .modal-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: var(--brand-primary);
-            margin: 0 auto 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 40px;
-            font-weight: 800;
-            overflow: hidden;
-            background-size: cover;
-            background-position: center;
-            cursor: pointer;
-        }
-        .modal-avatar:hover { transform: scale(1.05); }
-        .modal-fullname { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
-        .modal-username { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
-        .modal-bio { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
-        .modal-close {
-            background: var(--brand-primary);
-            color: white;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 40px;
-            font-weight: 600;
-            cursor: pointer;
-        }
+    .btn-svg:active { opacity: 0.6; transform: scale(0.85); }
 
-        /* Large Avatar Modal */
-        .avatar-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.9);
-            z-index: 400;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all var(--transition-normal);
-            cursor: pointer;
-        }
-        .avatar-modal.active { opacity: 1; visibility: visible; }
-        .large-avatar {
-            max-width: 90vw;
-            max-height: 90vh;
-            border-radius: 32px;
-            box-shadow: 0 32px 64px rgba(0,0,0,0.3);
-        }
+    .btn-play { 
+      width: 65px; 
+      height: 65px; 
+      border: 2.5px solid var(--icon-fill); 
+      border-radius: 50%; 
+      justify-content: center; 
+      transition: border-color 0.4s ease, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
 
-        /* Edit Room Modal */
-        .edit-room-modal {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-panel);
-            backdrop-filter: blur(40px);
-            border-radius: 28px 28px 0 0;
-            padding: 24px;
-            z-index: 250;
-            transform: translateY(100%);
-            transition: transform var(--transition-normal) var(--ease-spring);
-        }
-        .edit-room-modal.active { transform: translateY(0); }
+    .svg-icon { 
+      width: 26px; 
+      height: 26px; 
+      fill: var(--icon-fill); 
+      z-index: 2;
+      transition: fill 0.4s ease;
+    }
 
-        /* Profile Section */
-        .profile-card {
-            background: var(--bg-card);
-            border-radius: 28px;
-            padding: 24px;
-            text-align: center;
-        }
-        .profile-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: var(--brand-primary);
-            margin: 0 auto 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 40px;
-            font-weight: 800;
-            cursor: pointer;
-            background-size: cover;
-            background-position: center;
-        }
-        .profile-field { margin-bottom: 20px; text-align: left; }
-        .profile-field label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px; }
-        .profile-field input, .profile-field textarea {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--bg-alt);
-            border: 1px solid var(--border-strong);
-            border-radius: 16px;
-            font-size: 15px;
-            color: var(--text-main);
-        }
-        .profile-field input:focus, .profile-field textarea:focus {
-            border-color: var(--brand-primary);
-            outline: none;
-        }
-        .profile-actions { display: flex; gap: 12px; margin-top: 24px; }
+    .btn-svg.loop-active .svg-icon { fill: var(--spotify-green); }
 
-        /* Modals */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            backdrop-filter: blur(4px);
-            z-index: 200;
-            opacity: 0;
-            visibility: hidden;
-            transition: all var(--transition-normal);
-        }
-        .modal-overlay.active { opacity: 1; visibility: visible; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .loading-spinner {
+      position: absolute; 
+      top: -2.5px; left: -2.5px; right: -2.5px; bottom: -2.5px;
+      border: 3px solid transparent; 
+      border-top-color: var(--spotify-green); 
+      border-radius: 50%; 
+      animation: spin 0.8s linear infinite; 
+      z-index: 1;
+    }
 
-        .modal {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-panel);
-            backdrop-filter: blur(40px);
-            border-radius: 28px 28px 0 0;
-            padding: 24px;
-            z-index: 201;
-            transform: translateY(100%);
-            transition: transform var(--transition-normal) var(--ease-spring);
-        }
-        .modal.active { transform: translateY(0); }
-        .modal-header { font-size: 20px; font-weight: 800; margin-bottom: 20px; text-align: center; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
-        .form-input {
-            width: 100%;
-            padding: 14px 18px;
-            background: var(--bg-base);
-            border: 2px solid var(--border-strong);
-            border-radius: 20px;
-            font-size: 15px;
-        }
-        .form-input:focus { border-color: var(--brand-primary); outline: none; }
-        .room-type-selector { display: flex; gap: 12px; margin-top: 8px; }
-        .type-btn {
-            flex: 1;
-            padding: 12px;
-            border-radius: 16px;
-            background: var(--bg-base);
-            border: 1px solid var(--border-strong);
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .type-btn.active { background: var(--brand-alpha); border-color: var(--brand-primary); color: var(--brand-primary); }
-        .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
-        .btn {
-            flex: 1;
-            padding: 14px;
-            border-radius: 40px;
-            font-weight: 600;
-            cursor: pointer;
-            text-align: center;
-        }
-        .btn-primary { background: var(--brand-primary); color: white; border: none; }
-        .btn-ghost { background: var(--bg-base); border: 1px solid var(--border-strong); color: var(--text-main); }
+    .studio-box { text-align: center; padding: 30px 0; }
 
-        .section-page { display: none; }
-        .section-page.active { display: block; }
+    .timer { 
+      font-size: 64px; 
+      font-weight: 200; 
+      margin: 15px 0; 
+      font-variant-numeric: tabular-nums; 
+      letter-spacing: -2px;
+    }
 
-        .toast-wrapper {
-            position: fixed;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            pointer-events: none;
-        }
-        .toast-item {
-            background: var(--bg-panel);
-            backdrop-filter: blur(40px);
-            padding: 12px 20px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 13px;
-            box-shadow: var(--shadow-lg);
-            animation: toastIn 0.3s var(--ease-spring);
-        }
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateY(-20px) scale(0.9); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
+    .studio-viz { 
+      height: 80px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      gap: 4px; 
+      margin-bottom: 30px; 
+    }
 
-        @media (max-width: 768px) {
-            .search-input { width: 140px; }
-            .search-input:focus { width: 180px; }
-            .user-name { display: none; }
-            .room-actions { flex-direction: column; }
-            .rooms-container { max-height: calc(100vh - 320px); }
-        }
-    </style>
+    .s-bar { 
+      width: 5px; 
+      border-radius: 3px; 
+      background: var(--progress-bg); 
+      transition: height 0.08s ease, background-color 0.4s ease; 
+    }
+
+    .ios-input { 
+      width: 100%; 
+      padding: 18px; 
+      background: var(--bg-soft); 
+      border: none; 
+      border-radius: 16px; 
+      font-size: 17px; 
+      margin-bottom: 15px; 
+      color: var(--text-main);
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    .ios-input::placeholder {
+      color: var(--text-sec);
+    }
+
+    .nav-bar { 
+      position: fixed; 
+      bottom: 0; left: 0; right: 0; 
+      background: var(--nav-bg); 
+      backdrop-filter: blur(20px); 
+      -webkit-backdrop-filter: blur(20px);
+      display: flex; 
+      padding: 12px 0 35px; 
+      border-top: 1px solid var(--border-color); 
+      z-index: 1000; 
+      transition: background-color 0.4s ease, border-color 0.4s ease;
+    }
+
+    .nav-item { 
+      flex: 1; 
+      text-align: center; 
+      border: none; 
+      background: none; 
+      color: var(--text-sec); 
+      font-size: 11px; 
+      font-weight: 600; 
+      transition: color 0.3s ease;
+    }
+
+    .nav-item.active { color: var(--spotify-green); }
+
+    .nav-item svg { 
+      display: block; 
+      margin: 0 auto 6px; 
+      fill: currentColor; 
+      width: 24px; 
+      height: 24px; 
+    }
+
+    .page { display: none; }
+    .page.active { 
+      display: block; 
+      animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); 
+    }
+
+    #theme-toggle {
+      border: 1px solid var(--theme-btn-border); 
+      border-radius: 50%; 
+      padding: 8px; 
+      width: 45px; 
+      height: 45px; 
+      justify-content: center;
+      transition: border-color 0.4s ease, transform 0.2s;
+    }
+
+    @keyframes fadeIn { 
+      from { opacity: 0; transform: translateY(10px); } 
+      to { opacity: 1; transform: translateY(0); } 
+    }
+  </style>
 </head>
 <body>
 
-    <div class="toast-wrapper" id="toastWrapper"></div>
-
-    <div class="header">
-        <a href="index.html" class="logo"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--brand-primary)" stroke-width="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>MR <span>BOARD</span></a>
-        <div class="header-actions">
-            <div class="search-container"><i data-lucide="search" size="16" class="search-icon"></i><input type="text" id="searchInput" class="search-input" placeholder="Xona yoki foydalanuvchi..."></div>
-            <button class="theme-toggle" id="themeToggle"><i data-lucide="sun" id="themeIcon"></i><span id="themeText">Light</span></button>
-            <div class="user-info" id="currentUserInfo"><span class="user-name" id="userName"></span><div class="user-avatar" id="userAvatar"></div></div>
-        </div>
-    </div>
-
-    <div class="main-content">
-        <!-- Home Section -->
-        <div class="section-page active" id="homeSection">
-            <div class="welcome-card"><h1 id="welcomeMessage">Assalomu alaykum!</h1><p>Birgalikda ishlashni boshlang</p></div>
-            <div class="quick-actions"><button class="quick-action create" id="quickCreateBtn"><i data-lucide="plus-circle"></i> Yangi xona</button><button class="quick-action" id="quickJoinBtn"><i data-lucide="log-in"></i> Kod bilan kirish</button></div>
-            <div class="section-header"><h2 class="section-title">📋 Barcha xonalar</h2><button class="refresh-btn" id="refreshRoomsBtn"><i data-lucide="refresh-cw"></i></button></div>
-            <div class="rooms-container"><div id="roomsList" class="rooms-grid"><div class="empty-state">Yuklanmoqda...</div></div></div>
-        </div>
-
-        <!-- My Rooms Section -->
-        <div class="section-page" id="myRoomsSection">
-            <div class="section-header"><h2 class="section-title">⭐ Mening xonalarim</h2><button class="refresh-btn" id="refreshMyRoomsBtn"><i data-lucide="refresh-cw"></i></button></div>
-            <div class="rooms-container"><div id="myRoomsList" class="rooms-grid"><div class="empty-state">Yuklanmoqda...</div></div></div>
-        </div>
-
-        <!-- Profile Section -->
-        <div class="section-page" id="profileSection">
-            <div class="profile-card">
-                <div class="profile-avatar" id="profileAvatar" onclick="document.getElementById('avatarInput').click()"><span id="avatarText">U</span></div>
-                <input type="file" id="avatarInput" style="display: none;" accept="image/*">
-                <div class="profile-field"><label>Ism</label><input type="text" id="profileFullname" placeholder="Ismingiz"></div>
-                <div class="profile-field"><label>Familiya</label><input type="text" id="profileLastname" placeholder="Familiyangiz"></div>
-                <div class="profile-field"><label>Username</label><input type="text" id="profileUsername" placeholder="username"></div>
-                <div class="profile-field"><label>Email</label><input type="email" id="profileEmail" disabled style="background: var(--bg-alt);"></div>
-                <div class="profile-field"><label>Bio</label><textarea id="profileBio" rows="3" placeholder="O'zingiz haqingizda..."></textarea></div>
-                <div class="profile-actions"><button class="btn btn-primary" id="saveProfileBtn">💾 Saqlash</button><button class="btn btn-ghost" id="logoutBtn">🚪 Chiqish</button></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="bottom-tab-bar">
-        <button class="tab-item active" data-tab="home"><i data-lucide="home"></i><span>Bosh sahifa</span></button>
-        <button class="tab-item" data-tab="myrooms"><i data-lucide="star"></i><span>Mening xonalar</span></button>
-        <button class="tab-item" data-tab="profile"><i data-lucide="user"></i><span>Profil</span></button>
-    </div>
-
-    <!-- User Profile Modal -->
-    <div class="profile-modal" id="userProfileModal">
-        <div class="profile-modal-content">
-            <div class="modal-avatar" id="modalAvatar" onclick="showLargeAvatar()"><span id="modalAvatarText">U</span></div>
-            <div class="modal-fullname" id="modalFullname"></div>
-            <div class="modal-username" id="modalUsername"></div>
-            <div class="modal-bio" id="modalBio"></div>
-            <button class="modal-close" onclick="closeUserProfile()">Yopish</button>
-        </div>
-    </div>
-
-    <!-- Large Avatar Modal -->
-    <div class="avatar-modal" id="avatarModal" onclick="closeLargeAvatar()">
-        <img class="large-avatar" id="largeAvatarImg" src="" alt="Avatar">
-    </div>
-
-    <!-- Edit Room Modal -->
-    <div class="edit-room-modal" id="editRoomModal">
-        <div class="modal-header">✏️ Xonani tahrirlash</div>
-        <div class="form-group"><label>Xona nomi</label><input type="text" id="editRoomName" class="form-input" placeholder="Xona nomi"></div>
-        <div class="form-group"><label>Xona turi</label><div class="room-type-selector"><button class="type-btn" data-type="public" id="editPublicBtn">🌍 Public</button><button class="type-btn" data-type="private" id="editPrivateBtn">🔒 Private</button></div></div>
-        <div class="form-group" id="editPasswordGroup" style="display: none;"><label>Parol</label><input type="password" id="editRoomPassword" class="form-input" placeholder="Parol"></div>
-        <div class="modal-actions"><button class="btn btn-ghost" id="cancelEditBtn">Bekor</button><button class="btn btn-primary" id="saveEditBtn">Saqlash</button></div>
-    </div>
-
-    <!-- Create/Join Modals -->
-    <div class="modal-overlay" id="modalOverlay"></div>
-    <div class="modal" id="createRoomModal"><div class="modal-header">✨ Yangi xona yaratish</div><div class="form-group"><label>Xona nomi</label><input type="text" id="roomNameInput" class="form-input" placeholder="Masalan: Matematika 7-sinf"></div><div class="form-group"><label>Xona turi</label><div class="room-type-selector"><button class="type-btn active" data-type="public">🌍 Public</button><button class="type-btn" data-type="private">🔒 Private</button></div></div><div class="form-group" id="passwordGroup" style="display: none;"><label>Parol</label><input type="password" id="roomPassword" class="form-input" placeholder="Parol qo'yish"></div><div class="modal-actions"><button class="btn btn-ghost" id="cancelCreateBtn">Bekor</button><button class="btn btn-primary" id="confirmCreateBtn">Yaratish</button></div></div>
-    <div class="modal" id="joinRoomModal"><div class="modal-header">🔐 Xona kod bilan kirish</div><div class="form-group"><label>Xona kodi</label><input type="text" id="joinCodeInput" class="form-input" placeholder="Masalan: ABC123" maxlength="6" style="text-transform: uppercase;"></div><div class="form-group" id="joinPasswordGroup" style="display: none;"><label>Parol</label><input type="password" id="joinPassword" class="form-input" placeholder="Xona paroli"></div><div class="modal-actions"><button class="btn btn-ghost" id="cancelJoinBtn">Bekor</button><button class="btn btn-primary" id="confirmJoinBtn">Kirish</button></div></div>
-
-   <script type="module">
+<script type="module">
     // ========== MUSIQA PLAYER MODULE ==========
     // Bu kod musiqa tugaganda, agar takrorlash rejimi yoqilmagan bo'lsa,
     // avtomatik ravishda random keyingi musiqaga o'tadi
@@ -1032,5 +715,6 @@
     console.log('🎵 Music Player module loaded successfully!');
     console.log('💡 Asosiy xususiyat: Musiqa tugaganda random keyingi musiqaga o\'tish (agar takrorlash rejimi yoqilmagan bo\'lsa)');
 </script>
+
 </body>
 </html>
